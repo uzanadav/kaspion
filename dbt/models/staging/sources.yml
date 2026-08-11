@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: transactions
+
+  # Mutable application state written by the Python side (categorizer, CLI).
+  # dbt READS these as sources and must never materialize/rebuild them.
+  - name: state
+    schema: state
+    tables:
+      - name: ai_proposals
+      - name: merchant_overrides
+      - name: budgets
+      - name: excluded_transactions

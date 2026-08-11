@@ -1,0 +1,8 @@
+{
+  "name": "kaspion-scraper",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "israeli-bank-scrapers": "^6"
+  }
+}

@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: Cleaned raw transactions with a normalized merchant key.
+    columns:
+      - name: transaction_id
+        tests: [unique, not_null]
+      - name: account_type
+        tests:
+          - accepted_values:
+              values: ['bank', 'credit_card']
+      - name: merchant_key
+        tests: [not_null]
+
+  - name: int_transfers_detected
+    description: Both legs of detected inter-account (bank<->bank) transfers.
+
+  - name: int_card_payments
+    description: Bank-side monthly credit-card debits (חיוב), excluded from spend.
+
+  - name: int_categorized
+    description: Transactions with resolved category (override > AI > default) and exclusion flags.
+    columns:
+      - name: category_id
+        tests: [not_null]
+
+  - name: dim_category
+    description: Fixed household category list with Hebrew display names.
+    columns:
+      - name: category_id
+        tests: [unique, not_null]
+
+  - name: fct_spend
+    description: One row per real spend transaction; transfers and card debits excluded.
+    columns:
+      - name: category_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_category')
+              field: category_id
+
+  - name: fct_budget_pacing
+    description: Category x month actuals vs budget with prorated current-month pace.

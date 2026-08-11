@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: kaspion
+Version: 0.1.0
+Summary: Local-only, privacy-first household finance pipeline: DuckDB + dbt + AI categorization + Evidence dashboard
+Requires-Python: >=3.10
+Requires-Dist: duckdb>=1.1
+Requires-Dist: dbt-duckdb>=1.9
+Requires-Dist: requests>=2.32
+Requires-Dist: cryptography>=43.0
+Requires-Dist: pandas>=2.2
+Provides-Extra: claude
+Requires-Dist: anthropic>=0.40; extra == "claude"
+Provides-Extra: trackb
+Requires-Dist: mcp>=1.2; extra == "trackb"
+Requires-Dist: langgraph>=0.2; extra == "trackb"
+Requires-Dist: pyyaml>=6.0; extra == "trackb"
+Provides-Extra: dev
+Requires-Dist: ruff>=0.8; extra == "dev"
+Requires-Dist: pytest>=8.0; extra == "dev"

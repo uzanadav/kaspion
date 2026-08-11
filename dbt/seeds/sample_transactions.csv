@@ -1,0 +1,342 @@
+account_id,account_type,posted_date,amount,currency,raw_description,source,transaction_id
+leumi-main,bank,2026-02-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,f945adc4f3f18b42
+max-1234,credit_card,2026-02-02,-25.00,ILS,SPOTIFY,seed,c259d36cbfc27c7c
+max-1234,credit_card,2026-02-02,-611.37,ILS,ארנונה תל אביב,seed,f73293a792d2e408
+isracard-5678,credit_card,2026-02-02,-55.00,ILS,NETFLIX.COM,seed,fb4daa23ce2ad505
+max-1234,credit_card,2026-02-02,-107.47,ILS,סינמה סיטי,seed,30a9a2070b739ce6
+max-1234,credit_card,2026-02-03,-531.92,ILS,הפניקס ביטוח,seed,4c4496066c1de429
+max-1234,credit_card,2026-02-03,-2747.91,ILS,גן ילדים פרטי,seed,55d2353ff6eb2ac5
+isracard-5678,credit_card,2026-02-03,-41.24,ILS,GETT,seed,2bb81ec01c6b0a5f
+max-1234,credit_card,2026-02-04,-95.77,ILS,מי אביבים,seed,1e9f8d48b816e9e0
+max-1234,credit_card,2026-02-04,-58.00,ILS,GETT,seed,76c269c45549c3f3
+isracard-5678,credit_card,2026-02-05,-70.00,ILS,סופר פארם,seed,d69db5b3b7015d83
+isracard-5678,credit_card,2026-02-05,-12.00,ILS,iCloud,seed,20ebacc4b9c3948b
+isracard-5678,credit_card,2026-02-05,-364.27,ILS,הפניקס ביטוח,seed,5a516d7baf27cfd6
+max-1234,credit_card,2026-02-06,-74.32,ILS,GETT,seed,3f6f91483df03fdc
+max-1234,credit_card,2026-02-06,-153.10,ILS,סינמה סיטי,seed,e415bd436bf0dbdc
+isracard-5678,credit_card,2026-02-06,-25.00,ILS,SPOTIFY,seed,470282f64b8645f1
+isracard-5678,credit_card,2026-02-07,-77.79,ILS,מכבי שירותי בריאות,seed,531ecd3bcedaae51
+isracard-5678,credit_card,2026-02-07,-125.52,ILS,מי אביבים,seed,3dc5354886db63b0
+max-1234,credit_card,2026-02-07,-122.27,ILS,מי אביבים,seed,94cc3b54571f1f1f
+max-1234,credit_card,2026-02-08,-148.99,ILS,וולט,seed,0d7caaebe97c76d1
+max-1234,credit_card,2026-02-08,-180.01,ILS,מי אביבים,seed,2c833481def39a97
+leumi-main,bank,2026-02-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,3ecebec630af98d5
+max-1234,credit_card,2026-02-09,-167.41,ILS,מי אביבים,seed,37bd5c570dc3a6e5
+leumi-main,bank,2026-02-10,-3000.00,ILS,העברה לחשבון חסכון,seed,7efe02d9bd2f1745
+leumi-savings,bank,2026-02-10,3000.00,ILS,העברה מחשבון עוש,seed,12438156fffdfcef
+isracard-5678,credit_card,2026-02-12,-99.52,ILS,סינמה סיטי,seed,3fb0a58cc7b6fa20
+isracard-5678,credit_card,2026-02-13,-278.40,ILS,שופרסל דיל,seed,6271baf194fe0d66
+max-1234,credit_card,2026-02-13,-25.00,ILS,SPOTIFY,seed,7f3a40f4cddc76b1
+isracard-5678,credit_card,2026-02-13,-478.92,ILS,הפניקס ביטוח,seed,db118a08e6402f00
+isracard-5678,credit_card,2026-02-14,-119.64,ILS,רב קו אונליין,seed,8eda16effebf609d
+isracard-5678,credit_card,2026-02-14,-32.25,ILS,GETT,seed,4136aa690a2466fc
+max-1234,credit_card,2026-02-15,-75.62,ILS,רב קו אונליין,seed,51e488b22dd72c55
+isracard-5678,credit_card,2026-02-15,-92.36,ILS,מכבי שירותי בריאות,seed,78523b20695fce6c
+isracard-5678,credit_card,2026-02-16,-12.00,ILS,iCloud,seed,427d49c99c9a53b4
+max-1234,credit_card,2026-02-16,-329.68,ILS,מסעדת הבשריה,seed,2a1989955c012739
+max-1234,credit_card,2026-02-16,-151.36,ILS,יוחננוף,seed,5269b590cc43223d
+isracard-5678,credit_card,2026-02-16,-12.00,ILS,iCloud,seed,585f439bc315ccc7
+max-1234,credit_card,2026-02-17,-270.25,ILS,רמי לוי 342,seed,b468dbbb0b42d8c9
+isracard-5678,credit_card,2026-02-17,-181.00,ILS,סינמה סיטי,seed,0401f82a20bd468e
+isracard-5678,credit_card,2026-02-17,-132.57,ILS,סינמה סיטי,seed,adf27344814cd89e
+isracard-5678,credit_card,2026-02-18,-151.11,ILS,סופר פארם,seed,23ddfd07519babf9
+max-1234,credit_card,2026-02-18,-524.94,ILS,רמי לוי 342,seed,d432632a14f15bc8
+isracard-5678,credit_card,2026-02-18,-1450.11,ILS,KSP מחשבים,seed,84bef90d7e18a9f6
+max-1234,credit_card,2026-02-18,-2550.59,ILS,גן ילדים פרטי,seed,9eef3fe6d7d6daeb
+isracard-5678,credit_card,2026-02-19,-106.45,ILS,סינמה סיטי,seed,4f768ae263d894e1
+max-1234,credit_card,2026-02-19,-287.65,ILS,חברת החשמל,seed,3c3e1cf8697c8868
+isracard-5678,credit_card,2026-02-20,-431.76,ILS,יוחננוף,seed,6259be332c0fb773
+max-1234,credit_card,2026-02-22,-118.38,ILS,רב קו אונליין,seed,10f5f0080c6a1118
+isracard-5678,credit_card,2026-02-22,-290.36,ILS,פז יעד לוד,seed,350a109398c654a4
+isracard-5678,credit_card,2026-02-22,-229.80,ILS,פז יעד לוד,seed,7adb52a8ed92b753
+max-1234,credit_card,2026-02-22,-59.43,ILS,מכבי שירותי בריאות,seed,07d77c8fdc8dfa00
+max-1234,credit_card,2026-02-23,-885.74,ILS,KSP מחשבים,seed,a59671f5f74ff9db
+max-1234,credit_card,2026-02-23,-12.00,ILS,iCloud,seed,c433828262c1c8a4
+isracard-5678,credit_card,2026-02-24,-150.97,ILS,מסעדת הבשריה,seed,0c84ce6ac990025c
+max-1234,credit_card,2026-02-24,-102.43,ILS,שופרסל דיל,seed,d20b884ebbe9303a
+max-1234,credit_card,2026-02-25,-313.97,ILS,KSP מחשבים,seed,8d6f8317a2f63177
+isracard-5678,credit_card,2026-02-26,-581.12,ILS,ארנונה תל אביב,seed,91612e804d56f557
+max-1234,credit_card,2026-02-26,-384.07,ILS,שופרסל דיל,seed,cfed8302fec8de6f
+max-1234,credit_card,2026-02-26,-135.29,ILS,וולט,seed,aa0ff4a3af0ce2dd
+max-1234,credit_card,2026-02-27,-69.50,ILS,GETT,seed,814fd94aae9d9f4d
+max-1234,credit_card,2026-02-27,-661.00,ILS,רמי לוי 342,seed,b97d9d5fb6726848
+max-1234,credit_card,2026-02-27,-392.76,ILS,יוחננוף,seed,c8b0047b88f67c8b
+max-1234,credit_card,2026-02-28,-25.00,ILS,SPOTIFY,seed,d5d3ecf7ad463bac
+max-1234,credit_card,2026-02-28,-659.50,ILS,רמי לוי 342,seed,4f5160d53611f36a
+leumi-main,bank,2026-03-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,474ed360855d3c47
+max-1234,credit_card,2026-03-01,-74.57,ILS,סופר פארם,seed,c4189ef19effc622
+max-1234,credit_card,2026-03-01,-414.42,ILS,מסעדת הבשריה,seed,4d0b1359ed9a610d
+max-1234,credit_card,2026-03-02,-12.00,ILS,iCloud,seed,a5c92c167d3d6192
+max-1234,credit_card,2026-03-02,-528.94,ILS,ארנונה תל אביב,seed,5e5142a51f25e2b9
+max-1234,credit_card,2026-03-03,-127.41,ILS,יוחננוף,seed,8ba61aa6d420d3de
+isracard-5678,credit_card,2026-03-03,-98.51,ILS,סופר פארם,seed,7825c1b828584f76
+isracard-5678,credit_card,2026-03-04,-25.00,ILS,SPOTIFY,seed,321d188a9dcdad6a
+isracard-5678,credit_card,2026-03-04,-581.77,ILS,הפניקס ביטוח,seed,6297a1f227701654
+max-1234,credit_card,2026-03-05,-860.30,ILS,חברת החשמל,seed,8e09daebd221af7e
+max-1234,credit_card,2026-03-06,-247.81,ILS,יוחננוף,seed,4cad647d2695a73a
+isracard-5678,credit_card,2026-03-07,-295.69,ILS,מסעדת הבשריה,seed,58645a0392934a6e
+isracard-5678,credit_card,2026-03-07,-12.00,ILS,iCloud,seed,cc1bc12964af4337
+max-1234,credit_card,2026-03-07,-32.84,ILS,רב קו אונליין,seed,fda94d1fdf383abd
+isracard-5678,credit_card,2026-03-08,-157.73,ILS,שופרסל דיל,seed,e35cafc2df31ffee
+max-1234,credit_card,2026-03-08,-142.58,ILS,מכבי שירותי בריאות,seed,03e7cce2b6e07981
+leumi-main,bank,2026-03-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,bae896dba32ea495
+max-1234,credit_card,2026-03-09,-62.74,ILS,GETT,seed,22b7e0f827446631
+leumi-main,bank,2026-03-10,-13057.70,ILS,חיוב מקס איט פיננסים,seed,a99920094e8aa5c6
+leumi-main,bank,2026-03-10,-5601.16,ILS,חיוב ישראכרט,seed,ac43680506c8cc44
+leumi-main,bank,2026-03-10,-3000.00,ILS,העברה לחשבון חסכון,seed,0c6d1947823f50d4
+leumi-savings,bank,2026-03-10,3000.00,ILS,העברה מחשבון עוש,seed,345430dd1e3522ea
+isracard-5678,credit_card,2026-03-10,-25.00,ILS,SPOTIFY,seed,3b8a4cb0fc61d17f
+isracard-5678,credit_card,2026-03-13,-371.61,ILS,הפניקס ביטוח,seed,202fbdd463d3d7d5
+isracard-5678,credit_card,2026-03-13,-66.70,ILS,GETT,seed,8eda5fa43d0d181f
+isracard-5678,credit_card,2026-03-14,-384.72,ILS,מסעדת הבשריה,seed,7eaad6f6ab932df8
+isracard-5678,credit_card,2026-03-15,-39.69,ILS,קפה גרג,seed,1f58df3d5fe1b772
+max-1234,credit_card,2026-03-17,-122.75,ILS,ZARA TLV,seed,8dc99faf97f80d31
+max-1234,credit_card,2026-03-17,-124.52,ILS,וולט,seed,9ddff71c957fcd2b
+max-1234,credit_card,2026-03-18,-265.84,ILS,פז יעד לוד,seed,e0ad9c59c5136cac
+max-1234,credit_card,2026-03-18,-160.14,ILS,סינמה סיטי,seed,29cfde535b95f8b3
+max-1234,credit_card,2026-03-18,-406.10,ILS,הפניקס ביטוח,seed,03d5327aa1d43fad
+isracard-5678,credit_card,2026-03-19,-101.15,ILS,שופרסל דיל,seed,dffe23cf6ca33961
+max-1234,credit_card,2026-03-19,-686.91,ILS,KSP מחשבים,seed,949beffd3b5aef16
+max-1234,credit_card,2026-03-19,-283.31,ILS,יוחננוף,seed,19b47c98584e4163
+max-1234,credit_card,2026-03-20,-25.00,ILS,SPOTIFY,seed,804d3a21a4132da1
+isracard-5678,credit_card,2026-03-21,-190.72,ILS,פז יעד לוד,seed,d497d64ae5d7cebb
+max-1234,credit_card,2026-03-24,-82.83,ILS,GETT,seed,af77f0ec12b4d3b3
+max-1234,credit_card,2026-03-25,-25.23,ILS,GETT,seed,91e90865a2481820
+isracard-5678,credit_card,2026-03-26,-234.57,ILS,סופר פארם,seed,911cbdbfaf8608b6
+isracard-5678,credit_card,2026-03-26,-3111.68,ILS,גן ילדים פרטי,seed,da4aeea1a1881e3b
+isracard-5678,credit_card,2026-03-26,-834.34,ILS,חברת החשמל,seed,dc9a1e70e3c78af8
+max-1234,credit_card,2026-03-26,-380.04,ILS,הפניקס ביטוח,seed,d74f680b9981e2f9
+isracard-5678,credit_card,2026-03-26,-2805.19,ILS,גן ילדים פרטי,seed,43ca6f43f48e1a2a
+max-1234,credit_card,2026-03-27,-314.69,ILS,שופרסל דיל,seed,da8ba2ec2098def1
+max-1234,credit_card,2026-03-27,-318.24,ILS,יוחננוף,seed,94e4f2d15c251661
+isracard-5678,credit_card,2026-03-28,-164.66,ILS,וולט,seed,0d9bbd5764a1e058
+max-1234,credit_card,2026-03-29,-85.66,ILS,GETT,seed,6f2c4af939836c96
+isracard-5678,credit_card,2026-03-30,-57.43,ILS,קפה גרג,seed,9baa942a8bdec389
+isracard-5678,credit_card,2026-03-30,-41.32,ILS,GETT,seed,50f421317459c0d4
+max-1234,credit_card,2026-03-30,-179.83,ILS,ZARA TLV,seed,7fe5d4500ed640ae
+isracard-5678,credit_card,2026-03-31,-2923.01,ILS,גן ילדים פרטי,seed,9225ea7b6b45b150
+max-1234,credit_card,2026-03-31,-421.13,ILS,הפניקס ביטוח,seed,dfbc405c2aa022cb
+leumi-main,bank,2026-04-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,aaceba202ad3d21f
+max-1234,credit_card,2026-04-01,-71.07,ILS,GETT,seed,8d8869d08ea2e523
+max-1234,credit_card,2026-04-03,-55.00,ILS,NETFLIX.COM,seed,291edee9d1e70dd6
+max-1234,credit_card,2026-04-03,-209.84,ILS,ZARA TLV,seed,20a900df7d8601f8
+max-1234,credit_card,2026-04-03,-188.35,ILS,סופר פארם,seed,eb8dadbf6060cac2
+isracard-5678,credit_card,2026-04-07,-167.94,ILS,וולט,seed,59e281b2820f75e6
+max-1234,credit_card,2026-04-07,-103.81,ILS,סופר פארם,seed,3fe3e3f9d758f529
+isracard-5678,credit_card,2026-04-07,-56.96,ILS,רב קו אונליין,seed,d7caaab55a894bf9
+max-1234,credit_card,2026-04-08,-578.13,ILS,רמי לוי 342,seed,ead8d9b1488630cd
+isracard-5678,credit_card,2026-04-08,-165.07,ILS,מסעדת הבשריה,seed,d7ed60f7b1b926c4
+max-1234,credit_card,2026-04-08,-25.00,ILS,SPOTIFY,seed,4806acb7a18fd66e
+leumi-main,bank,2026-04-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,53b28a01bfbc7276
+max-1234,credit_card,2026-04-09,-98.82,ILS,מכבי שירותי בריאות,seed,34f437565c600e90
+leumi-main,bank,2026-04-10,-12522.49,ILS,חיוב ישראכרט,seed,0f084cde1c3a2053
+leumi-main,bank,2026-04-10,-6385.83,ILS,חיוב מקס איט פיננסים,seed,fc4288207e6eb75f
+leumi-main,bank,2026-04-10,-3000.00,ILS,העברה לחשבון חסכון,seed,8a659215544e1ff1
+leumi-savings,bank,2026-04-10,3000.00,ILS,העברה מחשבון עוש,seed,2760a42d0be8dc34
+isracard-5678,credit_card,2026-04-10,-90.24,ILS,מכבי שירותי בריאות,seed,c8168a3917bd21cc
+max-1234,credit_card,2026-04-10,-169.26,ILS,סופר פארם,seed,5ae81fbed7c3ff92
+max-1234,credit_card,2026-04-11,-426.61,ILS,חברת החשמל,seed,24554dd57287ac9e
+isracard-5678,credit_card,2026-04-11,-52.90,ILS,מכבי שירותי בריאות,seed,250b3838cceaab1f
+isracard-5678,credit_card,2026-04-12,-12.00,ILS,iCloud,seed,d380d1d0dbc85232
+max-1234,credit_card,2026-04-13,-166.20,ILS,סינמה סיטי,seed,d04ed31396f6ccd8
+max-1234,credit_card,2026-04-14,-70.68,ILS,מכבי שירותי בריאות,seed,99fe1d7a8b4afa37
+isracard-5678,credit_card,2026-04-15,-96.50,ILS,מכבי שירותי בריאות,seed,cbedefa14fcb2505
+isracard-5678,credit_card,2026-04-15,-76.00,ILS,וולט,seed,0d67a95dfbec1187
+isracard-5678,credit_card,2026-04-15,-83.09,ILS,מכבי שירותי בריאות,seed,1df49ab07d2df424
+max-1234,credit_card,2026-04-16,-32.77,ILS,קפה גרג,seed,6e8e22dab9e2ddba
+max-1234,credit_card,2026-04-16,-3243.66,ILS,גן ילדים פרטי,seed,7e1882232bebd212
+isracard-5678,credit_card,2026-04-17,-183.06,ILS,מי אביבים,seed,34fc39d9dceaf8c8
+isracard-5678,credit_card,2026-04-17,-171.90,ILS,סינמה סיטי,seed,fc139a694e154b3c
+isracard-5678,credit_card,2026-04-18,-3330.57,ILS,גן ילדים פרטי,seed,5bee82216d09a38b
+max-1234,credit_card,2026-04-18,-3480.72,ILS,גן ילדים פרטי,seed,187c453a3d314ace
+isracard-5678,credit_card,2026-04-21,-197.59,ILS,ZARA TLV,seed,3fefdc136ab1cc50
+isracard-5678,credit_card,2026-04-22,-486.95,ILS,הפניקס ביטוח,seed,fd6e57f093a6cd91
+isracard-5678,credit_card,2026-04-22,-120.85,ILS,וולט,seed,de4cc8559c9e1230
+max-1234,credit_card,2026-04-22,-25.00,ILS,SPOTIFY,seed,4a3ead211ae7566a
+max-1234,credit_card,2026-04-22,-235.14,ILS,מסעדת הבשריה,seed,442720c9e3e0fb73
+isracard-5678,credit_card,2026-04-25,-91.21,ILS,סינמה סיטי,seed,46436838e6a80333
+max-1234,credit_card,2026-04-25,-219.91,ILS,סופר פארם,seed,8d2ce5a3772a7556
+isracard-5678,credit_card,2026-04-26,-101.48,ILS,וולט,seed,b9f7b1012304367b
+max-1234,credit_card,2026-04-26,-453.35,ILS,הפניקס ביטוח,seed,b58e4b49f3353107
+isracard-5678,credit_card,2026-04-27,-3251.78,ILS,גן ילדים פרטי,seed,f0a01fea5cc57eb0
+isracard-5678,credit_card,2026-04-27,-804.74,ILS,חברת החשמל,seed,5fc2a7cdac438bd5
+isracard-5678,credit_card,2026-04-27,-517.25,ILS,הפניקס ביטוח,seed,2d3cb7e33577041d
+max-1234,credit_card,2026-04-29,-737.58,ILS,KSP מחשבים,seed,c9e1aa315ba3bbe6
+isracard-5678,credit_card,2026-04-29,-585.01,ILS,הפניקס ביטוח,seed,73aba556bc38142e
+leumi-main,bank,2026-05-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,9853b9aa0a3009b4
+isracard-5678,credit_card,2026-05-03,-417.17,ILS,ZARA TLV,seed,c63d71412e090b68
+isracard-5678,credit_card,2026-05-04,-602.28,ILS,רמי לוי 342,seed,dc47ca59cb3db723
+isracard-5678,credit_card,2026-05-06,-3266.90,ILS,גן ילדים פרטי,seed,c9e649be47e003c6
+max-1234,credit_card,2026-05-06,-1188.91,ILS,KSP מחשבים,seed,0106fa710fc492ab
+max-1234,credit_card,2026-05-07,-431.36,ILS,שופרסל דיל,seed,13644bb6832f3c5b
+max-1234,credit_card,2026-05-07,-469.19,ILS,הפניקס ביטוח,seed,cbb456b886952cb7
+max-1234,credit_card,2026-05-07,-58.58,ILS,GETT,seed,8a45bccb6291ea6a
+isracard-5678,credit_card,2026-05-08,-12.00,ILS,iCloud,seed,f3fdf038e2c8bc0b
+isracard-5678,credit_card,2026-05-08,-452.65,ILS,יוחננוף,seed,bb9990c4d9947537
+max-1234,credit_card,2026-05-08,-512.86,ILS,חברת החשמל,seed,b65d9404d8bb434d
+leumi-main,bank,2026-05-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,b99b61153aa93452
+isracard-5678,credit_card,2026-05-09,-40.90,ILS,קפה גרג,seed,9a3321037f9c8b18
+isracard-5678,credit_card,2026-05-09,-199.49,ILS,מי אביבים,seed,ebc2bc09b5eafe50
+leumi-main,bank,2026-05-10,-10643.09,ILS,חיוב ישראכרט,seed,f8878e139aa291cd
+leumi-main,bank,2026-05-10,-10590.90,ILS,חיוב מקס איט פיננסים,seed,4a0d9f2b1653c387
+leumi-main,bank,2026-05-10,-3000.00,ILS,העברה לחשבון חסכון,seed,c93f60dd21931fdc
+leumi-savings,bank,2026-05-10,3000.00,ILS,העברה מחשבון עוש,seed,9eb6007eb6ad7368
+isracard-5678,credit_card,2026-05-11,-84.45,ILS,סופר פארם,seed,de8de4c9f8152d96
+max-1234,credit_card,2026-05-11,-551.79,ILS,ארנונה תל אביב,seed,96c66748d62bdaf9
+max-1234,credit_card,2026-05-12,-699.95,ILS,רמי לוי 342,seed,bf626da1e439972c
+max-1234,credit_card,2026-05-12,-162.88,ILS,מי אביבים,seed,cfd5b637d6caf777
+max-1234,credit_card,2026-05-14,-57.63,ILS,סופר פארם,seed,e972d21f592f592c
+isracard-5678,credit_card,2026-05-16,-133.49,ILS,מכבי שירותי בריאות,seed,bdd8cb510d08d4a3
+max-1234,credit_card,2026-05-16,-281.20,ILS,רמי לוי 342,seed,c1837482ae3023b0
+isracard-5678,credit_card,2026-05-16,-2836.40,ILS,גן ילדים פרטי,seed,a3395b5e0ffa1d93
+max-1234,credit_card,2026-05-16,-388.03,ILS,יוחננוף,seed,17d8f4044d78b9e3
+max-1234,credit_card,2026-05-16,-214.92,ILS,מסעדת הבשריה,seed,f05cdc99e3db68ca
+isracard-5678,credit_card,2026-05-17,-557.62,ILS,חברת החשמל,seed,0e17904ea89a9290
+isracard-5678,credit_card,2026-05-18,-698.99,ILS,ארנונה תל אביב,seed,1bdd6186893c557f
+isracard-5678,credit_card,2026-05-18,-173.91,ILS,פז יעד לוד,seed,ad7058505f829c74
+max-1234,credit_card,2026-05-19,-767.55,ILS,חברת החשמל,seed,feff16c8e4e0ed11
+isracard-5678,credit_card,2026-05-20,-43.18,ILS,GETT,seed,ef4035017574e099
+max-1234,credit_card,2026-05-21,-123.75,ILS,רב קו אונליין,seed,bc3954ae056452a1
+max-1234,credit_card,2026-05-21,-25.00,ILS,SPOTIFY,seed,49fbfdb3f7c4d664
+isracard-5678,credit_card,2026-05-22,-277.12,ILS,שופרסל דיל,seed,c8293042dfa9acb5
+isracard-5678,credit_card,2026-05-23,-507.83,ILS,חברת החשמל,seed,ddf3b27bd44c1168
+max-1234,credit_card,2026-05-24,-2935.49,ILS,גן ילדים פרטי,seed,f3c27135bff476a5
+isracard-5678,credit_card,2026-05-24,-399.85,ILS,חברת החשמל,seed,2f6c10df8c80218b
+max-1234,credit_card,2026-05-25,-92.23,ILS,סינמה סיטי,seed,30262fa823e19914
+max-1234,credit_card,2026-05-27,-268.42,ILS,פז יעד לוד,seed,70ff003779fa0c9d
+isracard-5678,credit_card,2026-05-27,-113.56,ILS,מכבי שירותי בריאות,seed,c17d09efd6ca7448
+isracard-5678,credit_card,2026-05-27,-25.00,ILS,SPOTIFY,seed,4df1b5c08330933f
+max-1234,credit_card,2026-05-30,-626.15,ILS,חברת החשמל,seed,44e5b1be1c80cb55
+isracard-5678,credit_card,2026-05-30,-55.00,ILS,NETFLIX.COM,seed,4f07f45523d87393
+isracard-5678,credit_card,2026-05-31,-127.30,ILS,מי אביבים,seed,e2b7c6799f934412
+leumi-main,bank,2026-06-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,68d3e18f1d23f97c
+max-1234,credit_card,2026-06-01,-67.29,ILS,רב קו אונליין,seed,782962b76b318428
+isracard-5678,credit_card,2026-06-02,-106.86,ILS,מכבי שירותי בריאות,seed,cc89ec6b1bfdf5b9
+max-1234,credit_card,2026-06-03,-111.76,ILS,סינמה סיטי,seed,6bf973327de776be
+max-1234,credit_card,2026-06-03,-202.14,ILS,מסעדת הבשריה,seed,7554b460f5595afb
+max-1234,credit_card,2026-06-04,-896.05,ILS,חברת החשמל,seed,250a19dc0343c103
+max-1234,credit_card,2026-06-05,-710.21,ILS,חברת החשמל,seed,7581f3b643fcfebf
+max-1234,credit_card,2026-06-05,-178.81,ILS,שופרסל דיל,seed,1e37681103ecb12a
+isracard-5678,credit_card,2026-06-06,-195.50,ILS,פז יעד לוד,seed,00443155a5dbb2ac
+max-1234,credit_card,2026-06-06,-74.60,ILS,GETT,seed,5cae59f600e90379
+isracard-5678,credit_card,2026-06-06,-466.43,ILS,ZARA TLV,seed,7158d74d63cd47fd
+max-1234,credit_card,2026-06-07,-1426.63,ILS,KSP מחשבים,seed,50761ecc142529e5
+isracard-5678,credit_card,2026-06-08,-507.76,ILS,KSP מחשבים,seed,e5dad5a3a6742a45
+leumi-main,bank,2026-06-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,6069ef1c5b79af8d
+leumi-main,bank,2026-06-10,-9855.89,ILS,חיוב מקס איט פיננסים,seed,adfabd39589a0f1d
+leumi-main,bank,2026-06-10,-11025.09,ILS,חיוב ישראכרט,seed,d41e0230a02142b6
+leumi-main,bank,2026-06-10,-3000.00,ILS,העברה לחשבון חסכון,seed,8f1e6a15bc40b98d
+leumi-savings,bank,2026-06-10,3000.00,ILS,העברה מחשבון עוש,seed,b95f31321a5716eb
+isracard-5678,credit_card,2026-06-11,-561.16,ILS,חברת החשמל,seed,6cd91c3c64d6067c
+isracard-5678,credit_card,2026-06-11,-239.18,ILS,יוחננוף,seed,e55c688c13b51fd1
+max-1234,credit_card,2026-06-11,-225.81,ILS,מי אביבים,seed,ed511bd6145134f9
+max-1234,credit_card,2026-06-11,-25.00,ILS,SPOTIFY,seed,268abc0818082e1c
+max-1234,credit_card,2026-06-13,-428.85,ILS,ZARA TLV,seed,5cc72c6112f87475
+max-1234,credit_card,2026-06-13,-1185.97,ILS,KSP מחשבים,seed,0114fc5147855ed9
+isracard-5678,credit_card,2026-06-13,-78.82,ILS,מכבי שירותי בריאות,seed,6456692da1d2eead
+isracard-5678,credit_card,2026-06-15,-706.94,ILS,חברת החשמל,seed,3535df083b0b18c0
+isracard-5678,credit_card,2026-06-15,-535.45,ILS,חברת החשמל,seed,46b2e8f5bd7aa57b
+isracard-5678,credit_card,2026-06-16,-12.00,ILS,iCloud,seed,456c1f6c0e501a0f
+isracard-5678,credit_card,2026-06-16,-822.55,ILS,חברת החשמל,seed,e4fb2c21d0f37e3b
+isracard-5678,credit_card,2026-06-17,-862.74,ILS,חברת החשמל,seed,d86697b114835c09
+isracard-5678,credit_card,2026-06-17,-2554.20,ILS,גן ילדים פרטי,seed,5c1382433beedf58
+max-1234,credit_card,2026-06-18,-88.33,ILS,GETT,seed,8f4fc57d8527270d
+max-1234,credit_card,2026-06-18,-131.02,ILS,סינמה סיטי,seed,9676cabdfa6a9010
+max-1234,credit_card,2026-06-18,-178.11,ILS,סופר פארם,seed,30d526422faf4ceb
+max-1234,credit_card,2026-06-19,-449.09,ILS,ZARA TLV,seed,3cb2dc2f7a8b0d8c
+max-1234,credit_card,2026-06-19,-135.20,ILS,שופרסל דיל,seed,70dba52e05f7f6b6
+isracard-5678,credit_card,2026-06-19,-2797.35,ILS,גן ילדים פרטי,seed,8244d96edad27c28
+isracard-5678,credit_card,2026-06-20,-25.00,ILS,SPOTIFY,seed,1786acb260a3ae0e
+isracard-5678,credit_card,2026-06-20,-351.78,ILS,שופרסל דיל,seed,e23b78fb1fae0aec
+max-1234,credit_card,2026-06-20,-176.78,ILS,וולט,seed,6bfffbce2e7ca553
+max-1234,credit_card,2026-06-22,-330.81,ILS,ZARA TLV,seed,720f87910ed29a89
+max-1234,credit_card,2026-06-22,-30.94,ILS,GETT,seed,48c7c22a2866a346
+max-1234,credit_card,2026-06-22,-12.00,ILS,iCloud,seed,495d36eaa2cd23a4
+max-1234,credit_card,2026-06-23,-272.56,ILS,מסעדת הבשריה,seed,2f61e3f76e1e8a03
+max-1234,credit_card,2026-06-25,-664.62,ILS,חברת החשמל,seed,65b65a4622e17d96
+isracard-5678,credit_card,2026-06-25,-32.53,ILS,GETT,seed,a17f62c67feece6c
+isracard-5678,credit_card,2026-06-25,-587.62,ILS,ארנונה תל אביב,seed,ea5207e3f59b7ddf
+isracard-5678,credit_card,2026-06-26,-25.00,ILS,SPOTIFY,seed,082627555d2c6f0c
+max-1234,credit_card,2026-06-26,-469.56,ILS,יוחננוף,seed,5c95df61664ff058
+max-1234,credit_card,2026-06-26,-33.58,ILS,קפה גרג,seed,ccf3033918e9a59d
+isracard-5678,credit_card,2026-06-27,-12.00,ILS,iCloud,seed,b5319c4edbaca3fc
+max-1234,credit_card,2026-06-27,-139.01,ILS,רב קו אונליין,seed,bb2b9e2bec7b672a
+isracard-5678,credit_card,2026-06-27,-25.00,ILS,SPOTIFY,seed,eaff516e08fbe1d2
+max-1234,credit_card,2026-06-28,-225.74,ILS,מסעדת הבשריה,seed,56761bf11291ea68
+leumi-main,bank,2026-07-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,285f51c6308b8971
+isracard-5678,credit_card,2026-07-01,-41.60,ILS,GETT,seed,22f5a2f583422c50
+max-1234,credit_card,2026-07-02,-139.44,ILS,סינמה סיטי,seed,c5e2758daf9a430e
+max-1234,credit_card,2026-07-03,-351.00,ILS,הפניקס ביטוח,seed,efc03f5c8d885aad
+max-1234,credit_card,2026-07-05,-3147.71,ILS,גן ילדים פרטי,seed,ba1b2f9bdb800f0d
+isracard-5678,credit_card,2026-07-06,-3177.61,ILS,גן ילדים פרטי,seed,47a84c8811ec2b55
+isracard-5678,credit_card,2026-07-07,-406.61,ILS,KSP מחשבים,seed,6e7aa4d710e4c6d0
+isracard-5678,credit_card,2026-07-08,-148.02,ILS,מכבי שירותי בריאות,seed,a10d67821dfd8b8a
+max-1234,credit_card,2026-07-08,-264.36,ILS,פז יעד לוד,seed,3739367d103a64e6
+max-1234,credit_card,2026-07-08,-346.98,ILS,ZARA TLV,seed,3cdba507213a82bf
+isracard-5678,credit_card,2026-07-08,-967.59,ILS,KSP מחשבים,seed,2a1cce4cde72a4f7
+isracard-5678,credit_card,2026-07-08,-410.30,ILS,ZARA TLV,seed,d7739371a7629673
+leumi-main,bank,2026-07-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,bb806f73d8bec525
+isracard-5678,credit_card,2026-07-09,-303.55,ILS,ZARA TLV,seed,a517437fe535aaf2
+max-1234,credit_card,2026-07-09,-1309.64,ILS,KSP מחשבים,seed,7332913bdb5842ca
+max-1234,credit_card,2026-07-09,-58.17,ILS,קפה גרג,seed,aaccdc276596fee8
+leumi-main,bank,2026-07-10,-11505.87,ILS,חיוב ישראכרט,seed,0e8efff076dd3311
+leumi-main,bank,2026-07-10,-8870.47,ILS,חיוב מקס איט פיננסים,seed,fbc2befc3cb4f108
+leumi-main,bank,2026-07-10,-3000.00,ILS,העברה לחשבון חסכון,seed,c7b7c41ccd510658
+leumi-savings,bank,2026-07-10,3000.00,ILS,העברה מחשבון עוש,seed,5df948debec5c995
+max-1234,credit_card,2026-07-10,-43.38,ILS,GETT,seed,1322e7ec8220c60a
+isracard-5678,credit_card,2026-07-10,-697.81,ILS,ארנונה תל אביב,seed,205ce3b9d47ef69a
+isracard-5678,credit_card,2026-07-11,-25.00,ILS,SPOTIFY,seed,62c9e8b033d94469
+isracard-5678,credit_card,2026-07-14,-212.63,ILS,שופרסל דיל,seed,596cb90c61287c1b
+isracard-5678,credit_card,2026-07-15,-12.00,ILS,iCloud,seed,334cf824d350cb11
+max-1234,credit_card,2026-07-15,-3025.95,ILS,גן ילדים פרטי,seed,ae129afe9d01c881
+isracard-5678,credit_card,2026-07-15,-698.70,ILS,חברת החשמל,seed,229d270b45eedbe6
+max-1234,credit_card,2026-07-16,-81.82,ILS,מכבי שירותי בריאות,seed,17f6173ab866eb33
+isracard-5678,credit_card,2026-07-17,-143.42,ILS,מכבי שירותי בריאות,seed,5caad014f117985a
+isracard-5678,credit_card,2026-07-18,-25.00,ILS,SPOTIFY,seed,88390caf65e643db
+max-1234,credit_card,2026-07-19,-61.87,ILS,קפה גרג,seed,4c7c5079a1338e05
+isracard-5678,credit_card,2026-07-19,-478.09,ILS,יוחננוף,seed,8e076e12efd56219
+max-1234,credit_card,2026-07-19,-194.88,ILS,ZARA TLV,seed,8c88d7c4f6ec08fe
+isracard-5678,credit_card,2026-07-19,-300.96,ILS,רמי לוי 342,seed,e708671abc17c92a
+max-1234,credit_card,2026-07-21,-375.49,ILS,רמי לוי 342,seed,893f3e96eb622383
+isracard-5678,credit_card,2026-07-21,-242.20,ILS,מי אביבים,seed,391f6ee70b79e55e
+max-1234,credit_card,2026-07-21,-192.88,ILS,ZARA TLV,seed,6aaaf023363aeb52
+max-1234,credit_card,2026-07-23,-133.24,ILS,סינמה סיטי,seed,8ff809f54f6d279a
+isracard-5678,credit_card,2026-07-24,-199.69,ILS,סינמה סיטי,seed,7b4de9c7d7a1d041
+max-1234,credit_card,2026-07-24,-573.19,ILS,הפניקס ביטוח,seed,ac54c940ab09c8cd
+isracard-5678,credit_card,2026-07-24,-1048.87,ILS,KSP מחשבים,seed,35473706a7d094a3
+isracard-5678,credit_card,2026-07-25,-491.34,ILS,יוחננוף,seed,38513b311812dccf
+isracard-5678,credit_card,2026-07-26,-247.57,ILS,סופר פארם,seed,c3eb0281c8dc8c43
+max-1234,credit_card,2026-07-26,-279.89,ILS,חברת החשמל,seed,950a319d8ff5d4f5
+isracard-5678,credit_card,2026-07-28,-82.18,ILS,קפה גרג,seed,4e41bd29d75a2809
+isracard-5678,credit_card,2026-07-28,-190.47,ILS,מי אביבים,seed,4e474bd3b072f9f4
+max-1234,credit_card,2026-07-28,-899.59,ILS,חברת החשמל,seed,84dd74d98be9d3cc
+max-1234,credit_card,2026-07-29,-488.47,ILS,הפניקס ביטוח,seed,fa88ca700bf2422a
+max-1234,credit_card,2026-07-30,-2883.59,ILS,גן ילדים פרטי,seed,4edc26ffc88fcef4
+leumi-main,bank,2026-08-01,-6200.00,ILS,שכר דירה הוראת קבע,seed,765a26c78814fc39
+isracard-5678,credit_card,2026-08-02,-325.84,ILS,חברת החשמל,seed,7a3ec2a082e8f041
+isracard-5678,credit_card,2026-08-03,-350.97,ILS,שופרסל דיל,seed,7946c4e493cf3203
+isracard-5678,credit_card,2026-08-04,-448.49,ILS,שופרסל דיל,seed,e055ad9b961c984a
+isracard-5678,credit_card,2026-08-04,-77.91,ILS,קפה גרג,seed,c008aa857fc021f2
+max-1234,credit_card,2026-08-04,-129.31,ILS,מכבי שירותי בריאות,seed,d8df4fee9d375c49
+isracard-5678,credit_card,2026-08-05,-175.55,ILS,וולט,seed,f9848de33af0b742
+max-1234,credit_card,2026-08-05,-166.47,ILS,וולט,seed,2799955199ad19d4
+max-1234,credit_card,2026-08-05,-488.18,ILS,KSP מחשבים,seed,e2ead31abbe2b363
+isracard-5678,credit_card,2026-08-06,-735.86,ILS,חברת החשמל,seed,16c62f6afd01d21b
+max-1234,credit_card,2026-08-07,-124.44,ILS,רב קו אונליין,seed,f9d93891f656eb18
+isracard-5678,credit_card,2026-08-08,-93.00,ILS,סינמה סיטי,seed,4b84fb185243213c
+isracard-5678,credit_card,2026-08-08,-25.00,ILS,SPOTIFY,seed,9820afc94ece5c1f
+max-1234,credit_card,2026-08-08,-535.60,ILS,ארנונה תל אביב,seed,c84fa8bfbb227c58
+leumi-main,bank,2026-08-09,24500.00,ILS,משכורת חברת הייטק בעמ,seed,45e43d63f13bae82
+isracard-5678,credit_card,2026-08-09,-649.14,ILS,ארנונה תל אביב,seed,c99828be72914f70
+isracard-5678,credit_card,2026-08-09,-475.62,ILS,ZARA TLV,seed,ad8ecb58662b43ce
+isracard-5678,credit_card,2026-08-09,-418.17,ILS,ארנונה תל אביב,seed,68cdd11091a18354
+isracard-5678,credit_card,2026-08-09,-31.89,ILS,רב קו אונליין,seed,8b7575452a384cd6
+max-1234,credit_card,2026-08-09,-191.96,ILS,KSP מחשבים,seed,57350bbb38184ca7
+leumi-main,bank,2026-08-10,-14851.54,ILS,חיוב מקס איט פיננסים,seed,75c2d9492a00aee5
+leumi-main,bank,2026-08-10,-10551.21,ILS,חיוב ישראכרט,seed,48cffae361ef05b6
+leumi-main,bank,2026-08-10,-3000.00,ILS,העברה לחשבון חסכון,seed,054021d9f2f8d017
+leumi-savings,bank,2026-08-10,3000.00,ILS,העברה מחשבון עוש,seed,3ef171d231267588
+isracard-5678,credit_card,2026-08-11,-398.62,ILS,ZARA TLV,seed,13e29496e47e2ee3
+max-1234,credit_card,2026-08-11,-86.07,ILS,סינמה סיטי,seed,27a699f144d5d794
+max-1234,credit_card,2026-08-11,-3399.27,ILS,גן ילדים פרטי,seed,336c222d13952697
+isracard-5678,credit_card,2026-08-11,-193.22,ILS,סופר פארם,seed,3eb6e85116681b12

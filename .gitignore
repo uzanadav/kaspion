@@ -1,0 +1,24 @@
+# ─── personal data — NEVER commit ───────────────────────────
+# the DuckDB database, encryption key, credentials
+data/
+!data/.gitkeep
+*.duckdb
+*.duckdb.wal
+# generated dashboard — contains your real transactions
+dashboard.html
+# encrypted credential blobs + keys
+*.enc
+.kaspion_key
+.env
+
+# ─── generated / local tooling ──────────────────────────────
+__pycache__/
+.venv/
+node_modules/
+evals/last_run.json
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+logs/
+.DS_Store

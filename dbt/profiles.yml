@@ -1,0 +1,8 @@
+kaspion:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/finance.duckdb
+      schema: main
+      threads: 1
