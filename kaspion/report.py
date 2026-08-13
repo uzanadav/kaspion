@@ -149,16 +149,64 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>הכסף שלנו</title>
 <style>
-:root { --green:#1a9e6c; --red:#e5484d; --gray:#b8b3ab; --ink:#3d3a34; --soft:#8a857c;
-        --card:#ffffff; --bg:#faf6f0; --line:#efe9df; --accent:#d9c9a8; --sel:#f3ecdf; }
+:root {
+  /* tells the browser which native control colors (form fields, scrollbars) to use per theme */
+  color-scheme: light dark;
+  /* type scale */  --t1:.72rem; --t2:.82rem; --t3:.95rem; --t4:1.15rem; --t5:1.6rem; --t6:2.4rem;
+  /* spacing    */  --s1:4px; --s2:8px; --s3:12px; --s4:18px; --s5:26px; --s6:38px;
+  /* radius     */  --r1:10px; --r2:14px; --r3:20px;
+  /* surfaces   */  --bg:#faf7f2; --surface:#ffffff; --surface-2:#f4efe7; --line:#e9e2d6;
+  /* ink        */  --ink:#2f2c27; --ink-2:#6b655c; --ink-3:#989186;
+  /* semantic   */  --pos:#0e9f6e; --neg:#dc2626; --warn:#ca8a04; --accent:#c9b48a;
+  /* status pills (badges/banners) — tinted background + matching ink, one pair per state */
+  --pos-bg:#e7f6ee; --pos-ink:#116646; --warn-bg:#fdf3e0; --warn-ink:#8a5a00;
+  --neg-bg:#fdebec; --neg-ink:#a12b30;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  /* aliases kept so existing rules keep working during migration */
+  --green:var(--pos); --red:var(--neg); --gray:var(--ink-3);
+  --soft:var(--ink-2); --card:var(--surface); --sel:var(--surface-2);
+}
+/* dark: only tokens are redefined. Guarded so an explicit light choice still wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#131316; --surface:#1b1b1f; --surface-2:#26262c; --line:#33333b;
+    --ink:#ececf0; --ink-2:#a8a5ad; --ink-3:#77747c;
+    --pos:#12ad82; --neg:#e04a48; --warn:#a67c1a; --accent:#8a7b55;
+    --pos-bg:rgba(18,173,130,.18); --pos-ink:#4ad9ab;
+    --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
+    --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+  }
+}
+/* explicit toggle wins in BOTH directions */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#131316; --surface:#1b1b1f; --surface-2:#26262c; --line:#33333b;
+  --ink:#ececf0; --ink-2:#a8a5ad; --ink-3:#77747c;
+  --pos:#12ad82; --neg:#e04a48; --warn:#a67c1a; --accent:#8a7b55;
+  --pos-bg:rgba(18,173,130,.18); --pos-ink:#4ad9ab;
+  --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
+  --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+}
+:root[data-theme="light"] { color-scheme: light }
 * { box-sizing:border-box; margin:0 }
 html { font-size:17.5px }
 body { font-family:-apple-system, "Segoe UI", "Heebo", Arial, sans-serif;
        background:var(--bg); color:var(--ink); padding:24px 260px 60px 36px }
 
+/* Dates, times, ranges, amounts and account ids are LTR runs inside RTL text.
+   Without isolation the bidi algorithm reorders adjacent runs — "13.08.2026 11:01"
+   renders as "11:01 13.08.2026" even though the DOM text is correct. isolate is
+   what stops that leak; it does not change the text, only how it lays out. */
+/* text-align:end is needed alongside direction:ltr — forcing ltr on a table cell also
+   flips its own start/end alignment, which would pull numbers away from their header */
+.num { unicode-bidi:isolate; direction:ltr; display:inline-block; text-align:end }
+.nums { font-variant-numeric:tabular-nums }
+
 /* ---- sidebar (right rail, RTL-natural; bottom bar on mobile) ---- */
-#side { position:fixed; right:0; top:0; bottom:0; width:224px; background:var(--card);
-        border-left:1px solid var(--line); padding:26px 14px; display:flex; flex-direction:column }
+#side { position:fixed; inset-inline-start:0; top:0; bottom:0; width:224px; background:var(--card);
+        border-inline-end:1px solid var(--line); padding:26px 14px; display:flex; flex-direction:column }
 #side .logo { font-size:1.25rem; font-weight:800; text-align:center; margin-bottom:4px }
 #side .tag  { font-size:.7rem; color:var(--soft); text-align:center; margin-bottom:26px }
 #side nav { display:flex; flex-direction:column; gap:6px }
@@ -169,14 +217,17 @@ body { font-family:-apple-system, "Segoe UI", "Heebo", Arial, sans-serif;
 #side nav a .ico { font-size:1.15rem }
 #side .foot { margin-top:auto; font-size:.68rem; color:var(--soft); text-align:center; line-height:1.7 }
 #syncbtn { margin-top:18px; padding:11px; border-radius:12px; border:1px solid var(--line);
-        background:var(--card); font:inherit; font-size:.9rem; cursor:pointer }
+        background:var(--card); color:var(--ink); font:inherit; font-size:.9rem; cursor:pointer }
 #syncbtn:hover { background:var(--sel) }
 #syncbtn:disabled { opacity:.55; cursor:wait }
+#themebtn { margin-top:8px; padding:9px; border-radius:12px; border:1px solid transparent;
+        background:none; color:var(--ink-2); font:inherit; font-size:.82rem; cursor:pointer }
+#themebtn:hover { background:var(--sel); border-color:var(--line) }
 
 /* ---- header ---- */
 /* content hugs the sidebar on the right instead of floating in the middle */
 .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;
-        max-width:1280px; margin-right:0; margin-left:auto }
+        max-width:1280px; margin-inline-start:0; margin-inline-end:auto }
 h1 { font-size:1.45rem }
 /* month strip: every month is one tap away */
 .months { display:flex; gap:7px; max-width:1280px; margin:0 0 20px auto; overflow-x:auto;
@@ -184,11 +235,11 @@ h1 { font-size:1.45rem }
 .mchip { flex:none; padding:8px 16px; border-radius:20px; border:1px solid var(--line);
         background:var(--card); font:inherit; font-size:.88rem; cursor:pointer; color:var(--ink) }
 .mchip:hover { background:var(--sel) }
-.mchip.sel { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:700 }
+.mchip.sel { background:var(--ink); border-color:var(--ink); color:var(--bg); font-weight:700 }
 .mchip .now { display:inline-block; width:7px; height:7px; border-radius:50%;
         background:var(--green); margin-inline-start:6px; vertical-align:middle }
 .sub { color:var(--soft); font-size:.85rem; max-width:1280px; margin:0 0 14px auto }
-main { max-width:1280px; margin-right:0; margin-left:auto }
+main { max-width:1280px; margin-inline-start:0; margin-inline-end:auto }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 22px; align-items:start }
 @media (max-width:1000px) { .grid2 { grid-template-columns:1fr } }
 .view { display:none } .view.on { display:block }
@@ -197,12 +248,13 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 
 /* ---- cards & banner ---- */
 .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
-.card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 14px; text-align:center }
-.card .lbl { font-size:.8rem; color:var(--soft) }
-.card .val { font-size:1.45rem; font-weight:700; margin-top:4px }
-/* money coming in gets its own accent so the two halves of the month read at a glance */
-.card.in { background:linear-gradient(180deg,#f2faf6,var(--card)); border-color:#cfe9dc }
-.card.in .val { color:var(--green) }
+.card { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s4) var(--s3); text-align:center; box-shadow:var(--shadow) }
+.card .lbl { font-size:var(--t2); color:var(--soft) }
+.card .val { font-size:var(--t5); font-weight:700; margin-top:4px }
+/* money coming in gets its own accent + dominant size — it's the figure the eye lands on first */
+.card.in { background:linear-gradient(180deg,var(--pos-bg),var(--surface)); border-color:var(--pos-bg) }
+.card.in .val { color:var(--green); font-size:var(--t6) }
 .card .sub2 { font-size:.68rem; color:var(--soft); margin-top:3px; min-height:1em }
 /* the pace now rides in the spend card's subline, so it needs its own colour rule —
    .good/.bad elsewhere are scoped to .val/.tsave and would not apply here */
@@ -211,8 +263,9 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 @media (max-width:900px) { .cards { grid-template-columns:repeat(2,1fr) } }
 .val.good { color:var(--green) } .val.bad { color:var(--red) }
 .banner { margin:14px 0 0; padding:13px 16px; border-radius:14px; font-weight:600; font-size:.95rem }
-.banner.good { background:#e7f6ee; color:#116646 } .banner.bad { background:#fdebec; color:#a12b30 }
-.panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px }
+.banner.good { background:var(--pos-bg); color:var(--pos-ink) } .banner.bad { background:var(--neg-bg); color:var(--neg-ink) }
+.panel { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s4); box-shadow:var(--shadow) }
 
 /* ---- overview: donut + legend + top5 ---- */
 .split { display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:center }
@@ -227,11 +280,11 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .leg .nm { flex:1 } .leg .am { font-weight:600 }
 
 /* ---- categories view ---- */
-.cat { margin-bottom:6px; padding:9px 11px; border-radius:12px; cursor:pointer; transition:background .15s }
+.cat { margin-bottom:var(--s1); padding:var(--s3); border-radius:var(--r1); cursor:pointer; transition:background .15s }
 .cat:hover { background:var(--bg) }
-.cat-line { display:flex; justify-content:space-between; font-size:.92rem; margin-bottom:5px }
+.cat-line { display:flex; justify-content:space-between; font-size:var(--t3); margin-bottom:5px }
 .cat-amt small { color:var(--soft); font-weight:400 }
-.sugg-tag { font-size:.62rem; font-weight:600; color:#8a6d3b; background:var(--accent);
+.sugg-tag { font-size:.62rem; font-weight:600; color:var(--warn-ink); background:var(--warn-bg);
         padding:1px 7px; border-radius:8px; margin-inline-start:6px; cursor:help }
 /* progress fill anchors to the RIGHT and grows leftward (natural for Hebrew) */
 .bar { height:9px; background:var(--line); border-radius:6px; overflow:hidden;
@@ -245,7 +298,7 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .tplot { position:relative; display:flex; align-items:flex-end }
 .tbar { width:100%; background:var(--accent); border-radius:6px 6px 0 0; transition:background .15s }
 /* income as a rule across the column: spend below it = living within your means */
-.tinc { position:absolute; left:0; right:0; border-top:2px dashed var(--green);
+.tinc { position:absolute; inset-inline:0; border-top:2px dashed var(--green);
         pointer-events:none }
 /* .over = spent more than came in that month */
 .tinc.over { border-top-color:var(--red) }
@@ -253,7 +306,7 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
         font-weight:600; color:var(--green); background:var(--card); padding:0 3px;
         border-radius:4px }
 .tinc.over span { color:var(--red) }
-.tcol:hover .tbar { background:#c5ae82 }
+.tcol:hover .tbar { background:var(--ink-3) }
 .tcol.sel .tbar { background:var(--green) }
 .tval { font-size:.62rem; color:var(--soft); margin-bottom:3px }
 .tlab { font-size:.72rem; color:var(--soft); margin-top:5px }
@@ -268,14 +321,14 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 
 /* ---- per-category trend cards ---- */
 .catgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:12px }
-.catcard { background:var(--card); border:1px solid var(--line); border-radius:14px;
-        padding:14px 16px; cursor:pointer; transition:border-color .15s }
+.catcard { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s3) var(--s4); cursor:pointer; transition:border-color .15s; box-shadow:var(--shadow) }
 .catcard:hover { border-color:var(--accent) }
-.cc-head { display:flex; justify-content:space-between; align-items:center; font-size:1rem; font-weight:600 }
-.badge { font-size:.74rem; font-weight:600; padding:3px 10px; border-radius:10px; white-space:nowrap }
-.badge.ok  { background:#e7f6ee; color:#116646 }
-.badge.mid { background:#fdf3e0; color:#8a5a00 }
-.badge.bad { background:#fdebec; color:#a12b30 }
+.cc-head { display:flex; justify-content:space-between; align-items:center; font-size:var(--t4); font-weight:600 }
+.badge { font-size:var(--t1); font-weight:600; padding:3px 10px; border-radius:var(--r1); white-space:nowrap }
+.badge.ok  { background:var(--pos-bg); color:var(--pos-ink) }
+.badge.mid { background:var(--warn-bg); color:var(--warn-ink) }
+.badge.bad { background:var(--neg-bg); color:var(--neg-ink) }
 .cc-chart { display:flex; gap:8px; align-items:flex-start; margin-top:12px }
 /* the month row lives inside the plot so it lines up with the bars automatically,
    instead of being nudged by hand to clear the axis gutter */
@@ -289,7 +342,7 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
         color:var(--ink); font-weight:600; background:var(--card); padding:0 2px }
 .cc-bars { height:68px; display:flex; gap:6px; align-items:flex-end; position:relative }
 .mb { flex:1; max-width:24px; margin:0 auto; border-radius:4px 4px 0 0; min-height:3px }
-.tline { position:absolute; left:0; right:0; border-top:2px dashed var(--ink);
+.tline { position:absolute; inset-inline:0; border-top:2px dashed var(--ink);
         opacity:.45; pointer-events:none }
 .cc-months { display:flex; gap:6px; margin-top:6px }
 .cc-months span { flex:1; text-align:center; font-size:.62rem; color:var(--soft);
@@ -300,15 +353,15 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .cc-now b { color:var(--ink); font-weight:600 }
 
 /* ---- tables ---- */
-table { width:100%; border-collapse:collapse; font-size:.88rem }
-th { text-align:right; color:var(--soft); font-weight:500; font-size:.78rem; padding:6px 4px;
+table { width:100%; border-collapse:collapse; font-size:var(--t2) }
+th { text-align:start; color:var(--soft); font-weight:500; font-size:var(--t1); padding:var(--s2) 4px;
      border-bottom:1px solid var(--line) }
 th.sortable { cursor:pointer; user-select:none; white-space:nowrap }
 th.sortable:hover { color:var(--ink) }
 th .arr { font-size:.6rem }
-td { padding:8px 4px; border-bottom:1px solid var(--line) }
+td { padding:var(--s2) 4px; border-bottom:1px solid var(--line) }
 tr:last-child td { border-bottom:0 }
-.amt { font-weight:600; white-space:nowrap }
+.amt { font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; unicode-bidi:isolate; direction:ltr; text-align:end }
 .amt.in { color:var(--green) }
 /* money-direction filter: one row of segmented buttons above the table */
 .fseg { display:inline-flex; gap:6px; margin:0 0 10px }
@@ -317,22 +370,27 @@ tr:last-child td { border-bottom:0 }
 .fseg button:hover { background:var(--sel) }
 .fseg button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:700 }
 .catname { font-size:.82rem; color:var(--soft) }
-/* ---- data-source freshness ---- */
-.srcgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:10px }
-.srcbox { border:1px solid var(--line); border-radius:12px; padding:11px 13px }
-.srchead { display:flex; align-items:center; gap:7px; font-weight:600; font-size:.92rem }
-.srchead i { width:9px; height:9px; border-radius:50%; flex:none }
-.srcline { font-size:.74rem; color:var(--soft); margin-top:5px; line-height:1.6 }
-.srcline b { color:var(--ink); font-weight:600 }
-.srcage { font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:9px; margin-inline-start:auto }
-.srcage.ok   { background:#e7f6ee; color:#116646 }
-.srcage.warn { background:#fdf3e0; color:#8a5a00 }
-.srcage.old  { background:#fdebec; color:#a12b30 }
+/* ---- data-source freshness: one compact row per account, not a stack of labels ---- */
+.srcgrid { display:flex; flex-direction:column; gap:1px; background:var(--line);
+        border-radius:var(--r1); overflow:hidden; border:1px solid var(--line) }
+.srcrow { display:flex; align-items:center; gap:var(--s3); background:var(--surface);
+        padding:var(--s3) var(--s4); font-size:var(--t2) }
+.srcname { display:flex; align-items:center; gap:var(--s2); font-weight:600;
+        font-size:var(--t3); flex:1; min-width:0 }
+.srcname i { width:9px; height:9px; border-radius:50%; flex:none }
+.srcrange { color:var(--ink-2) }
+.srccount { color:var(--ink-2); white-space:nowrap }
+.srccount b { color:var(--ink); font-weight:600 }
+.srcage { font-size:var(--t1); font-weight:700; padding:2px 9px; border-radius:9px; white-space:nowrap }
+.srcage.ok   { background:var(--pos-bg); color:var(--pos-ink) }
+.srcage.warn { background:var(--warn-bg); color:var(--warn-ink) }
+.srcage.old  { background:var(--neg-bg); color:var(--neg-ink) }
+@media (max-width:640px) { .srcrow { flex-wrap:wrap } .srcrange { order:3; width:100%; margin-inline-start:24px } }
 /* issuer badge: colored dot carries identity, text stays in the normal ink color */
 .iss { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:.82rem }
 .iss i { width:9px; height:9px; border-radius:50%; flex:none }
 input { width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:12px;
-        font:inherit; background:var(--card); margin-bottom:10px }
+        font:inherit; background:var(--card); color:var(--ink); margin-bottom:10px }
 .chip { display:none; margin:0 0 10px; padding:7px 14px; background:var(--sel); border:1px solid var(--accent);
         border-radius:20px; font-size:.85rem; cursor:pointer }
 .chip.on { display:inline-block }
@@ -340,18 +398,29 @@ input { width:100%; padding:10px 14px; border:1px solid var(--line); border-radi
 /* ---- edit mode (only when served via python3 -m kaspion.serve) ---- */
 .addrow { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:8px }
 .addrow select, .addrow button { padding:10px 12px; border:1px solid var(--line); border-radius:12px;
-        font:inherit; background:var(--card) }
+        font:inherit; background:var(--card); color:var(--ink) }
 .addrow button { background:var(--green); color:#fff; border:0; font-weight:700; cursor:pointer }
 .addrow button:disabled { opacity:.5 }
 button.del { border:0; background:none; cursor:pointer; font-size:.95rem; opacity:.45 }
 button.del:hover { opacity:1 }
-select.recat { padding:5px 8px; border:1px solid var(--line); border-radius:9px;
-        font:inherit; font-size:.82rem; background:var(--card); cursor:pointer }
+select.recat { padding:5px 8px; border:1px solid transparent; border-radius:9px;
+        font:inherit; font-size:.82rem; background:none; color:var(--ink); cursor:pointer }
+select.recat:hover, select.recat:focus { border-color:var(--line); background:var(--card) }
 input.budget-edit { width:5.2em; padding:3px 6px; margin:0; border:1px solid var(--line);
-        border-radius:8px; font:inherit; font-size:.82rem; text-align:center; background:var(--bg) }
+        border-radius:8px; font:inherit; font-size:.82rem; text-align:center; background:var(--bg); color:var(--ink) }
 input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--card) }
 .uprow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center }
 #catman .uprow { grid-template-columns:2fr 1fr auto }
+/* secondary tool, not a headline panel — smaller and flatter than the budget list above it */
+#catman { background:var(--surface-2); box-shadow:none; font-size:var(--t2) }
+/* add/upload are occasional actions, not the default view of the page — collapsed by default */
+.toolbar { margin-bottom:var(--s4) }
+.toolbar summary { cursor:pointer; padding:var(--s3) var(--s4); background:var(--surface-2);
+        border:1px solid var(--line); border-radius:var(--r1); font-weight:600; font-size:var(--t2);
+        color:var(--ink-2); list-style:none }
+.toolbar summary::-webkit-details-marker { display:none }
+.toolbar summary:hover { color:var(--ink) }
+.toolbar[open] summary { border-radius:var(--r1) var(--r1) 0 0; margin-bottom:var(--s3) }
 .ctag { display:inline-flex; align-items:center; gap:7px; background:var(--sel);
         border:1px solid var(--accent); border-radius:20px; padding:5px 12px;
         margin:0 0 6px 6px; font-size:.85rem }
@@ -366,9 +435,9 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 
 @media (max-width:760px) {
   body { padding:18px 14px 86px }
-  #side { top:auto; bottom:0; left:0; right:0; width:auto; height:64px; flex-direction:row; align-items:center;
-          justify-content:space-around; padding:0; border-left:0; border-top:1px solid var(--line); z-index:9 }
-  #side .logo, #side .tag, #side .foot, #syncbtn, #syncmsg { display:none }
+  #side { top:auto; bottom:0; inset-inline:0; width:auto; height:64px; flex-direction:row; align-items:center;
+          justify-content:space-around; padding:0; border-inline-end:0; border-top:1px solid var(--line); z-index:9 }
+  #side .logo, #side .tag, #side .foot, #syncbtn, #syncmsg, #themebtn { display:none }
   #side nav { flex-direction:row; gap:0; width:100%; justify-content:space-around }
   #side nav a { flex-direction:column; gap:2px; padding:8px 10px; font-size:.68rem }
   .cards { grid-template-columns:1fr 1fr } .card:first-child { grid-column:1/-1 }
@@ -387,7 +456,8 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
   </nav>
   <button id="syncbtn" title="מושך תנועות חדשות, בונה מחדש את הנתונים ומרענן את הדף">🔄 סנכרון עכשיו</button>
   <div class="hint" id="syncmsg" style="text-align:center; margin-top:6px"></div>
-  <div class="foot">עודכן __GENERATED__<br>kaspion · נוצר מ־sync.py</div>
+  <button id="themebtn" title="מצב תצוגה">🌙 מצב כהה</button>
+  <div class="foot">עודכן <span class="num">__GENERATED__</span><br>kaspion · נוצר מ־sync.py</div>
 </aside>
 
 <div class="head">
@@ -453,31 +523,34 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 
 <!-- ================= transactions ================= -->
 <section class="view" id="v-txns">
-  <div class="panel addform" id="addform" style="margin-bottom:14px">
-    <div style="font-weight:700; margin-bottom:10px">➕ הוספת הוצאה ידנית</div>
-    <div class="addrow">
-      <input id="a-desc" placeholder="תיאור (למשל: פלאפל בשוק)" style="margin:0">
-      <input id="a-amt" type="number" min="0" step="0.01" placeholder="סכום ₪" style="margin:0">
-      <input id="a-date" type="date" style="margin:0">
-      <select id="a-cat"></select>
-      <button id="a-go">הוספה</button>
+  <details class="toolbar">
+    <summary>➕ הוספת הוצאה · טעינת קובץ</summary>
+    <div class="panel addform" id="addform" style="margin-bottom:14px">
+      <div style="font-weight:700; margin-bottom:10px">➕ הוספת הוצאה ידנית</div>
+      <div class="addrow">
+        <input id="a-desc" placeholder="תיאור (למשל: פלאפל בשוק)" style="margin:0">
+        <input id="a-amt" type="number" min="0" step="0.01" placeholder="סכום ₪" style="margin:0">
+        <input id="a-date" type="date" style="margin:0">
+        <select id="a-cat"></select>
+        <button id="a-go">הוספה</button>
+      </div>
+      <div class="hint" id="a-msg" style="margin-top:6px"></div>
     </div>
-    <div class="hint" id="a-msg" style="margin-top:6px"></div>
-  </div>
-  <div class="panel addform" id="upform" style="margin-bottom:14px">
-    <div style="font-weight:700; margin-bottom:10px">📄 טעינת קובץ עסקאות (ישראכרט · ONE ZERO)</div>
-    <div class="uprow">
-      <input id="u-file" type="file" accept=".xlsx,.xls" multiple style="margin:0">
-      <button id="u-go">טעינה</button>
+    <div class="panel addform" id="upform" style="margin-bottom:14px">
+      <div style="font-weight:700; margin-bottom:10px">📄 טעינת קובץ עסקאות (ישראכרט · ONE ZERO)</div>
+      <div class="uprow">
+        <input id="u-file" type="file" accept=".xlsx,.xls" multiple style="margin:0">
+        <button id="u-go">טעינה</button>
+      </div>
+      <div class="hint" style="margin-top:6px">
+        הורידו את פירוט העסקאות מאתר ישראכרט או מאפליקציית ONE ZERO (קובץ Excel) וטענו אותו כאן ·
+        הקובץ מזוהה אוטומטית · אפשר לבחור כמה קבצים יחד ·
+        טעינה חוזרת של אותו קובץ בטוחה ולא תיצור כפילויות ·
+        חיובי כרטיסי האשראי בחשבון הבנק לא נספרים פעמיים
+      </div>
+      <div class="hint" id="u-msg" style="margin-top:6px"></div>
     </div>
-    <div class="hint" style="margin-top:6px">
-      הורידו את פירוט העסקאות מאתר ישראכרט או מאפליקציית ONE ZERO (קובץ Excel) וטענו אותו כאן ·
-      הקובץ מזוהה אוטומטית · אפשר לבחור כמה קבצים יחד ·
-      טעינה חוזרת של אותו קובץ בטוחה ולא תיצור כפילויות ·
-      חיובי כרטיסי האשראי בחשבון הבנק לא נספרים פעמיים
-    </div>
-    <div class="hint" id="u-msg" style="margin-top:6px"></div>
-  </div>
+  </details>
   <span class="chip" id="chip"></span>
   <div class="fseg" id="fseg">
     <button data-f="all" class="on">הכל</button>
@@ -517,24 +590,34 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 
 <script>
 const DATA = __DATA__;
-const PALETTE = ['#1a9e6c','#e0a63a','#5b8def','#e5484d','#8e6fd8','#d97b4f','#4fb3bf','#97a25e','#b8b3ab'];
+// validated (dataviz/scripts/validate_palette.js) categorical palettes, one per theme —
+// same hue order, re-stepped for each surface so CVD separation holds in both
+const PALETTE_LIGHT = ['#0e9f6e','#c2410c','#2563eb','#dc2626','#7c3aed','#ca8a04','#0891b2','#65a30d'];
+const PALETTE_DARK  = ['#12ad82','#dd6b30','#4a86e8','#e04a48','#9268e0','#a67c1a','#0d9cba','#78a028'];
+const NEUTRAL_LIGHT = '#989186', NEUTRAL_DARK = '#77747c';
+const isDark = () => document.documentElement.dataset.theme === 'dark'
+  || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+const PALETTE = () => isDark() ? PALETTE_DARK : PALETTE_LIGHT;
 // which institution each charge came from. Colors are drawn from PALETTE above (not the
 // issuers' real brand colors) and the mark is a dot beside the name, never colored text —
 // so the label stays legible and the file stays self-contained (no external logo requests).
 const ISSUERS = {
-  max:      { label: 'מקס',      color: '#5b8def' },
-  isracard: { label: 'ישראכרט',  color: '#8e6fd8' },
-  visaCal:  { label: 'כאל',      color: '#e0a63a' },
-  amex:     { label: 'אמריקן',   color: '#4fb3bf' },
-  leumi:    { label: 'לאומי',    color: '#1a9e6c' },
-  hapoalim: { label: 'הפועלים',  color: '#e5484d' },
+  max:      { label: 'מקס',      idx: 2 },
+  isracard: { label: 'ישראכרט',  idx: 4 },
+  visaCal:  { label: 'כאל',      idx: 5 },
+  amex:     { label: 'אמריקן',   idx: 6 },
+  leumi:    { label: 'לאומי',    idx: 0 },
+  hapoalim: { label: 'הפועלים',  idx: 3 },
   // both spellings: the scraper's company id is camelCase, the file importer's
   // account_id is lowercase — they must land on the same badge
-  oneZero:  { label: 'ONE ZERO', color: '#d97b4f' },
-  onezero:  { label: 'ONE ZERO', color: '#d97b4f' },
-  manual:   { label: 'ידני',     color: '#b8b3ab' },
+  oneZero:  { label: 'ONE ZERO', idx: 1 },
+  onezero:  { label: 'ONE ZERO', idx: 1 },
+  manual:   { label: 'ידני',     idx: null },
 };
-const issuerOf = k => ISSUERS[k] || { label: k || '—', color: '#b8b3ab' };
+const issuerOf = k => {
+  const e = ISSUERS[k] || { label: k || '—', idx: null };
+  return { label: e.label, color: e.idx == null ? (isDark() ? NEUTRAL_DARK : NEUTRAL_LIGHT) : PALETTE()[e.idx] };
+};
 const VIEWS = { overview:'סקירה', cats:'קטגוריות', txns:'תנועות', trends:'מגמות' };
 const ils = x => '₪' + Math.round(x).toLocaleString('he-IL');
 const $ = id => document.getElementById(id);
@@ -557,6 +640,7 @@ let mi = Math.max(DATA.months.findIndex(m => m.key === DATA.startKey), 0);
 let selCat = null;
 let flow = 'all';               // money direction shown: all | out (spend) | in (income)
 let sort = { k: 0, dir: -1 };   // default: date, newest first
+let theme = 'auto';             // auto | light | dark
 
 /* ---------- keep your place across the reload every edit triggers ---------- */
 // Saving a category rebuilds the page and reloads it; without this you'd be thrown
@@ -566,7 +650,7 @@ function saveUi() {
   try {
     sessionStorage.setItem(UI_KEY, JSON.stringify({
       view, month: DATA.months[mi] ? DATA.months[mi].key : null,
-      selCat, sort, flow, search: $('s') ? $('s').value : '',
+      selCat, sort, flow, search: $('s') ? $('s').value : '', theme,
     }));
   } catch (e) { /* private mode — never fail an edit over bookkeeping */ }
 }
@@ -583,7 +667,19 @@ function restoreUi() {
   if (['all', 'in', 'out'].includes(saved.flow)) flow = saved.flow;
   if (saved.sort && typeof saved.sort.k === 'number') sort = saved.sort;
   if (saved.search && $('s')) $('s').value = saved.search;
+  if (['auto', 'light', 'dark'].includes(saved.theme)) theme = saved.theme;
 }
+function applyTheme() {
+  document.documentElement.dataset.theme = theme === 'auto' ? '' : theme;
+  $('themebtn').textContent = isDark() ? '☀️ מצב בהיר' : '🌙 מצב כהה';
+}
+$('themebtn').onclick = () => {
+  theme = isDark() ? 'light' : 'dark';
+  applyTheme(); saveUi(); render();   // charts re-read PALETTE()
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (theme === 'auto') { applyTheme(); render(); }
+});
 function applyView() {
   document.querySelectorAll('#side nav a')
     .forEach(x => x.classList.toggle('on', x.dataset.v === view));
@@ -721,15 +817,16 @@ function renderSources() {
     const ageTxt = s.staleDays <= 0 ? 'היום'
                  : s.staleDays === 1 ? 'אתמול'
                  : `לפני ${s.staleDays} ימים`;
-    return `<div class="srcbox">
-      <div class="srchead"><i style="background:${iss.color}"></i>${iss.label}
-        <span class="srcage ${age}">${ageTxt}</span></div>
-      <div class="srcline">
-        תנועה אחרונה: <b>${s.to}</b><br>
-        טווח הנתונים: ${s.from} – ${s.to}<br>
-        <b>${s.n.toLocaleString('he-IL')}</b> תנועות · ${s.account}<br>
-        נטען לאחרונה: ${s.loaded}
-      </div></div>`;
+    // one compact row: dot+name, freshness pill, an ISOLATED date range (.num — this
+    // is the bug site: a date range is two LTR runs, and without isolation the bidi
+    // algorithm reorders them), transaction count. Load time moves into the title
+    // tooltip instead of its own line — it's detail, not something read at a glance.
+    return `<div class="srcrow" title="נטען לאחרונה: ${escAttr(s.loaded)} · ${escAttr(s.account)}">
+      <span class="srcname"><i style="background:${iss.color}"></i>${iss.label}</span>
+      <span class="srcage ${age}">${ageTxt}</span>
+      <span class="num srcrange">${s.from} – ${s.to}</span>
+      <span class="srccount"><b class="num">${s.n.toLocaleString('he-IL')}</b> תנועות</span>
+    </div>`;
   }).join('') || '<div class="hint">אין עדיין נתונים</div>';
 }
 
@@ -775,11 +872,11 @@ function renderOverview(m) {
   const parts = [...top.map(c => ({ name: c.name, v: c.actual })),
                  ...(rest > 0 ? [{ name: 'אחרים', v: rest }] : [])];
   const total = parts.reduce((s, p) => s + p.v, 0) || 1;
-  const R = 80, C = 2 * Math.PI * R;
+  const R = 80, C = 2 * Math.PI * R, pal = PALETTE();
   let off = 0, svg = '';
   parts.forEach((p, i) => {
     const frac = p.v / total;
-    svg += `<circle cx="105" cy="105" r="${R}" fill="none" stroke="${PALETTE[i % PALETTE.length]}"
+    svg += `<circle cx="105" cy="105" r="${R}" fill="none" stroke="${pal[i % pal.length]}"
       stroke-width="30" stroke-dasharray="${(frac * C).toFixed(1)} ${C.toFixed(1)}"
       stroke-dashoffset="${(-off * C).toFixed(1)}"></circle>`;
     off += frac;
@@ -788,7 +885,7 @@ function renderOverview(m) {
   $('donut-total').textContent = ils(m.spent);
   $('legend').innerHTML = parts.map((p, i) =>
     `<div class="leg" data-cat="${p.name}">
-       <span class="dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+       <span class="dot" style="background:${pal[i % pal.length]}"></span>
        <span class="nm">${p.name}</span><span class="am">${ils(p.v)}</span>
        <span class="hint">${Math.round(p.v / total * 100)}%</span></div>`).join('')
     || '<div class="hint">אין עדיין הוצאות החודש 🎉</div>';
@@ -797,7 +894,7 @@ function renderOverview(m) {
   // biggest EXPENSES — m.txns now carries income too, and a salary would otherwise
   // sit at the top of a list titled "the 5 biggest expenses"
   $('top5').tBodies[0].innerHTML = [...m.txns].filter(t => !t[10]).sort((a, b) => b[4] - a[4]).slice(0, 5)
-    .map(t => `<tr><td>${t[1]}</td><td>${t[2]}</td><td>${t[3]}</td><td class="amt">${ils(t[4])}</td></tr>`)
+    .map(t => `<tr><td class="num">${t[1]}</td><td>${t[2]}</td><td>${t[3]}</td><td class="amt nums">${ils(t[4])}</td></tr>`)
     .join('') || '<tr><td colspan="4" class="hint">אין תנועות</td></tr>';
 }
 
@@ -870,8 +967,8 @@ function renderTxns() {
       <i style="background:${s.color}"></i>${s.label}</span></td>`;
   };
   $('t').tBodies[0].innerHTML = rows.map(t =>
-    `<tr><td>${t[1]}</td><td>${t[2]}</td>${issCell(t)}${catCell(t)}
-     <td class="amt ${t[10] ? 'in' : ''}">${t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
+    `<tr><td class="num">${t[1]}</td><td>${t[2]}</td>${issCell(t)}${catCell(t)}
+     <td class="amt nums ${t[10] ? 'in' : ''}">${t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
      <td><button class="del" title="הסתרת התנועה" data-id="${t[6]}">🗑</button></td></tr>`).join('')
     || '<tr><td colspan="7" class="hint">לא נמצאו תנועות</td></tr>';
   document.querySelectorAll('#t .del').forEach(b => b.onclick = () => {
@@ -925,8 +1022,8 @@ function renderTrends(m) {
   document.querySelectorAll('.tcol').forEach(el => el.onclick = () => { mi = +el.dataset.i; render(); });
 
   $('save').tBodies[0].innerHTML = [...DATA.months].reverse().map(x =>
-    `<tr><td>${x.label}</td><td>${ils(x.income)}</td><td>${ils(x.spent)}</td>
-     <td class="${x.saved >= 0 ? 'pos' : 'neg'}">${x.saved >= 0 ? '+' : '−'}${ils(Math.abs(x.saved))}</td></tr>`).join('');
+    `<tr><td>${x.label}</td><td class="num nums">${ils(x.income)}</td><td class="num nums">${ils(x.spent)}</td>
+     <td class="num nums ${x.saved >= 0 ? 'pos' : 'neg'}">${x.saved >= 0 ? '+' : '−'}${ils(Math.abs(x.saved))}</td></tr>`).join('');
 
   // per-category small multiples: bars per month, colored by budget status
   const cats = {};
@@ -1021,6 +1118,7 @@ function renderTrends(m) {
 }
 
 restoreUi();
+applyTheme();
 applyView();
 render();
 </script>
