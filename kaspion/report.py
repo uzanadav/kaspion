@@ -387,7 +387,7 @@ tr:last-child td { border-bottom:0 }
 .fseg button { padding:7px 16px; border:1px solid var(--line); border-radius:20px;
         background:var(--card); font:inherit; font-size:.85rem; cursor:pointer; color:var(--ink) }
 .fseg button:hover { background:var(--sel) }
-.fseg button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:700 }
+.fseg button.on { background:var(--ink); border-color:var(--ink); color:var(--bg); font-weight:700 }
 .catname { font-size:.82rem; color:var(--soft) }
 /* ---- data-source freshness: one compact row per account, not a stack of labels ---- */
 .srcgrid { display:flex; flex-direction:column; gap:1px; background:var(--line);
