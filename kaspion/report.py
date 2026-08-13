@@ -271,10 +271,11 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .val.good { color:var(--green) } .val.bad { color:var(--red) }
 .banner { margin:14px 0 0; padding:13px 16px; border-radius:14px; font-weight:600; font-size:.95rem }
 .banner.good { background:var(--pos-bg); color:var(--pos-ink) } .banner.bad { background:var(--neg-bg); color:var(--neg-ink) }
-/* insight strip: short computed observations, sitting under the banner */
-.insights { display:flex; flex-direction:column; gap:var(--s2); margin:var(--s3) 0 0 }
-.ins { display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4);
-       border-radius:var(--r1); background:var(--surface-2); font-size:var(--t2) }
+/* insight strip: short computed observations, same connected-list look as .srcgrid */
+.insights { display:flex; flex-direction:column; gap:1px; background:var(--line);
+        border-radius:var(--r1); overflow:hidden; border:1px solid var(--line) }
+.ins { display:flex; align-items:center; gap:var(--s3); padding:var(--s2) var(--s4);
+       background:var(--surface); font-size:var(--t2) }
 .ins-dot { width:7px; height:7px; border-radius:50%; flex:none; background:var(--ink-3) }
 .ins.good .ins-dot { background:var(--pos) }
 .ins.bad .ins-dot  { background:var(--neg) }
@@ -492,9 +493,8 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
       <div class="sub2" id="saved-sub"></div></div>
   </div>
   <div class="banner" id="banner"></div>
+  <h2>תובנות</h2>
   <div class="insights" id="insights"></div>
-  <h2>מקורות המידע</h2>
-  <div class="panel"><div id="srcgrid" class="srcgrid"></div></div>
 
   <div class="grid2">
     <div>
@@ -514,6 +514,9 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
       </table></div>
     </div>
   </div>
+
+  <h2>מקורות המידע</h2>
+  <div class="panel"><div id="srcgrid" class="srcgrid"></div></div>
 </section>
 
 <!-- ================= categories ================= -->
