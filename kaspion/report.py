@@ -38,7 +38,7 @@ def _collect() -> dict:
 
     pacing = q("""
         select strftime(p.posted_month, '%Y-%m'), c.name_he, p.actual_ils, p.budget_ils,
-               p.budget_to_date_ils, p.pace_status, p.category_id, p.budget_is_suggested
+               p.pace_status, p.category_id, p.budget_is_suggested
         from main.fct_budget_pacing p join main.dim_category c using (category_id)
         where p.category_id != 'income'
         order by p.actual_ils desc
@@ -108,15 +108,14 @@ def _collect() -> dict:
     def month(key: str) -> dict:
         return months.setdefault(
             key, {"key": key, "label": _label(key), "spent": 0.0, "budget": 0.0,
-                  "toDate": 0.0, "income": 0.0, "cats": [], "txns": []}
+                  "income": 0.0, "cats": [], "txns": []}
         )
 
-    for key, name, actual, budget, to_date, status, cat_id, suggested in pacing:
+    for key, name, actual, budget, status, cat_id, suggested in pacing:
         m = month(key)
         actual, budget = float(actual), float(budget or 0)
         m["spent"] += actual
         m["budget"] += budget
-        m["toDate"] += float(to_date or 0)
         m["cats"].append({
             "id": cat_id, "name": name, "actual": actual, "budget": budget,
             "status": status, "suggested": bool(suggested),
@@ -136,7 +135,7 @@ def _collect() -> dict:
     current_key = datetime.now().strftime("%Y-%m")
     for m in ordered:
         m["isCurrent"] = m["key"] == current_key
-        m["pace"] = round(m["toDate"] - m["spent"], 2)
+        m["pace"] = round(m["budget"] - m["spent"], 2)
         m["saved"] = round(m["income"] - m["spent"], 2)
     return {
         "months": ordered,

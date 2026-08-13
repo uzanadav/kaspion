@@ -83,7 +83,6 @@ select
     actual_ils,
     budget_ils,
     budget_is_suggested,
-    round(coalesce(budget_ils, 0), 2)               as budget_to_date_ils,
     round(coalesce(budget_ils, 0) - actual_ils, 2)  as pace_ils,
     case
         when budget_ils is null then 'no_budget'
