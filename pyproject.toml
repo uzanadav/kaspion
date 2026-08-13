@@ -8,7 +8,6 @@ dependencies = [
     "dbt-duckdb>=1.9",
     "requests>=2.32",
     "cryptography>=43.0",
-    "pandas>=2.2",
     # reading bank/card statement exports uploaded from the dashboard:
     # openpyxl for .xlsx (Isracard), xlrd for legacy OLE2 .xls (ONE ZERO)
     "openpyxl>=3.1",
@@ -17,7 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 claude = ["anthropic>=0.40"]
-trackb = ["mcp>=1.2", "langgraph>=0.2", "pyyaml>=6.0"]
 dev = ["ruff>=0.8", "pytest>=8.0"]
 
 [tool.ruff]
@@ -28,4 +26,4 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["kaspion", "kaspion.ingest", "kaspion.ai", "kaspion.semantic", "kaspion.mcp", "kaspion.agent"]
+packages = ["kaspion", "kaspion.ingest", "kaspion.ai"]

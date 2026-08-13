@@ -105,7 +105,7 @@ def main() -> None:
 
 
 def _total_txns() -> int:
-    con = connect(read_only=True)
+    con = connect()
     total = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
     con.close()
     return total

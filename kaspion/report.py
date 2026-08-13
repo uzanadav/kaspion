@@ -33,7 +33,7 @@ def _label(key: str) -> str:
 
 
 def _collect() -> dict:
-    con = connect(read_only=True)
+    con = connect()
     q = lambda sql: con.execute(sql).fetchall()  # noqa: E731
 
     pacing = q("""

@@ -6,6 +6,7 @@ equal each card's statement sum (so card-payment detection has real work to do).
 """
 from __future__ import annotations
 
+import calendar
 import csv
 import hashlib
 import random
@@ -69,9 +70,7 @@ def generate(months_back: int = 6, seed: int = 42) -> list[dict]:
     # "this month" view has data); future-dated rows are filtered at the end.
     for month_start in [*month_range(months_back), today.replace(day=1)]:
         y, m = month_start.year, month_start.month
-        days_in_month = (
-            (month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        ).day
+        days_in_month = calendar.monthrange(y, m)[1]
 
         # salary (inflow) on the 9th
         rows.append(_row("leumi-main", date(y, m, 9), 24500.00, "משכורת חברת הייטק בעמ"))

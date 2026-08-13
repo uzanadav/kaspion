@@ -58,14 +58,12 @@ CREATE TABLE IF NOT EXISTS state.excluded_transactions (
 );
 """
 
-def connect(read_only: bool = False) -> duckdb.DuckDBPyConnection:
+def connect() -> duckdb.DuckDBPyConnection:
     """Open the household database.
 
-    Note: `read_only` is accepted for call-site clarity but ignored — DuckDB's
-    Python driver caches the database per process and errors if the same file is
-    opened with different configs, so we always use one (read-write) config.
+    Always read-write: DuckDB's Python driver caches the database per process and
+    errors if the same file is opened with different configs.
     """
-    del read_only
     DB_PATH.parent.mkdir(exist_ok=True)
     con = duckdb.connect(str(DB_PATH))
     con.execute(DDL)
