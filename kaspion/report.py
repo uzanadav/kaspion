@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from kaspion.db import connect
+from kaspion.insights import build_insights
 
 OUT = Path(__file__).resolve().parents[1] / "dashboard.html"
 
@@ -54,7 +55,10 @@ def _collect() -> dict:
                -- the institution the charge came from, which the UI badges per row
                split_part(t.account_id, '-', 1) as issuer,
                t.account_id,
-               case when t.amount > 0 then 1 else 0 end as is_income
+               case when t.amount > 0 then 1 else 0 end as is_income,
+               -- normalized in stg_transactions (branch digits stripped): the only stable
+               -- merchant identity, needed to spot recurring charges and first-time ones
+               t.merchant_key
         from main.int_categorized t join main.dim_category c using (category_id)
         where not t.is_transfer
           and not t.is_card_payment
@@ -118,9 +122,10 @@ def _collect() -> dict:
             "status": status, "suggested": bool(suggested),
         })
 
-    for key, iso, d, desc, cat, amt, src, txn_id, cat_id, issuer, account, is_income in txns:
+    for key, iso, d, desc, cat, amt, src, txn_id, cat_id, issuer, account, is_income, mkey in txns:
         month(key)["txns"].append(
-            [iso, d, desc, cat, float(amt), src, txn_id, cat_id, issuer, account, int(is_income)]
+            [iso, d, desc, cat, float(amt), src, txn_id, cat_id, issuer, account,
+             int(is_income), mkey]
         )
 
     for key, inc in income:
@@ -135,6 +140,8 @@ def _collect() -> dict:
         m["saved"] = round(m["income"] - m["spent"], 2)
     return {
         "months": ordered,
+        # computed in Python, never by a model: figures must be exact
+        "insights": build_insights(ordered, current_key),
         "categories": [{"id": c, "name": n, "custom": bool(x)} for c, n, x in categories],
         "sources": [{"src": s, "account": a, "n": n, "from": f, "to": t,
                      "loaded": ld, "staleDays": int(sd)}
@@ -264,6 +271,13 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .val.good { color:var(--green) } .val.bad { color:var(--red) }
 .banner { margin:14px 0 0; padding:13px 16px; border-radius:14px; font-weight:600; font-size:.95rem }
 .banner.good { background:var(--pos-bg); color:var(--pos-ink) } .banner.bad { background:var(--neg-bg); color:var(--neg-ink) }
+/* insight strip: short computed observations, sitting under the banner */
+.insights { display:flex; flex-direction:column; gap:var(--s2); margin:var(--s3) 0 0 }
+.ins { display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4);
+       border-radius:var(--r1); background:var(--surface-2); font-size:var(--t2) }
+.ins-dot { width:7px; height:7px; border-radius:50%; flex:none; background:var(--ink-3) }
+.ins.good .ins-dot { background:var(--pos) }
+.ins.bad .ins-dot  { background:var(--neg) }
 .panel { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
         padding:var(--s4); box-shadow:var(--shadow) }
 
@@ -478,6 +492,7 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
       <div class="sub2" id="saved-sub"></div></div>
   </div>
   <div class="banner" id="banner"></div>
+  <div class="insights" id="insights"></div>
   <h2>מקורות המידע</h2>
   <div class="panel"><div id="srcgrid" class="srcgrid"></div></div>
 
@@ -830,6 +845,22 @@ function renderSources() {
   }).join('') || '<div class="hint">אין עדיין נתונים</div>';
 }
 
+function renderInsights() {
+  // Insights describe the whole history, not the month chip that happens to be selected,
+  // so they are rendered straight from DATA and never re-filtered per month.
+  const box = $('insights'), items = DATA.insights || [];
+  box.innerHTML = '';
+  if (!items.length) return;               // no history yet: show nothing, not an empty box
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // every amount is an LTR run inside RTL text: without isolation "₪29,192" beside a
+  // month name renders reversed — the bug that started the redesign
+  const nums = s => s.replace(/₪[\d,]+|\d[\d,]*(?:\.\d+)?%?/g,
+                              t => `<span class="num">${t}</span>`);
+  box.innerHTML = items.map(i =>
+    `<div class="ins ${i.tone}"><span class="ins-dot"></span>${nums(esc(i.text))}</div>`
+  ).join('');
+}
+
 function renderOverview(m) {
   renderSources();
   $('spent').textContent = ils(m.spent);
@@ -864,6 +895,7 @@ function renderOverview(m) {
     $('banner').className = 'banner bad';
     $('banner').textContent = `⚠️ שימו לב — הוצאתם ${ils(-left)} יותר ממה שנכנס החודש`;
   }
+  renderInsights();
 
   // donut: top 6 categories + "אחרים"
   const cats = [...m.cats].sort((a, b) => b.actual - a.actual);
