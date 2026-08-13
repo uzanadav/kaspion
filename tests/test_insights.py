@@ -129,3 +129,43 @@ def test_limit_and_one_per_kind():
     assert len(out) <= 3
     assert len(_kinds(out)) == len(out)
     assert out == sorted(out, key=lambda i: -i["score"])
+
+
+def test_every_insight_links_somewhere_real():
+    """A click must land on a known view and a month that actually exists."""
+    months = [_month("2026-05", spent=5000, income=9000),
+              _month("2026-06", spent=6000, income=9000),
+              _month("2026-07", spent=9000, income=9000),
+              _month(CUR, spent=20000, income=9000)]
+    out = build_insights(months, CUR, limit=9)
+    assert out
+    keys = {m["key"] for m in months}
+    for i in out:
+        assert i["link"]["view"] in {"txns", "cats", "trends"}
+        assert i["link"].get("month", CUR) in keys
+
+
+def test_recurring_link_lists_exactly_the_merchants_it_counted():
+    """The headline count and the drill-down must agree, or the click disproves the claim."""
+    def m(key, n):
+        return _month(key, txns=[_txn(amount=100, merchant=f"sub{i}") for i in range(n)])
+    months = [m("2026-06", 4), m("2026-07", 4), _month(CUR)]
+    rec = [i for i in build_insights(months, CUR, limit=9) if i["kind"] == "recurring"][0]
+    assert rec["text"].startswith("4 ")
+    assert set(rec["link"]["merchants"]) == {f"sub{i}" for i in range(4)}
+
+
+def test_category_move_link_points_at_what_it_describes():
+    cats = lambda v: [{"id": "c", "name": "דיור", "actual": v,
+                       "budget": 0, "status": "no_budget", "suggested": False}]
+    months = [_month("2026-05", cats=cats(200)), _month("2026-06", cats=cats(200)),
+              _month("2026-07", cats=cats(2000)), _month(CUR)]
+    mv = [i for i in build_insights(months, CUR, limit=9) if i["kind"] == "category_move"][0]
+    assert mv["link"] == {"view": "txns", "month": "2026-07", "cat": "דיור"}
+
+
+def test_uncategorized_link_filters_to_unclassified_rows():
+    cur = _month(CUR, txns=[_txn(emoji="❔") for _ in range(6)])
+    unc = [i for i in build_insights([_month("2026-07"), cur], CUR, limit=9)
+           if i["kind"] == "uncategorized"][0]
+    assert unc["link"]["uncat"] is True and unc["link"]["month"] == CUR

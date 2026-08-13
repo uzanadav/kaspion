@@ -72,6 +72,7 @@ def _concentration(cur: dict) -> dict | None:
     if share < 50:  # not concentrated enough to be worth a line
         return None
     return {"kind": "concentration", "tone": "neutral", "score": 45 + share / 10,
+            "link": {"view": "cats", "month": cur["key"]},
             "text": f"{round(share)}% מההוצאות החודש מרוכזים בשלוש קטגוריות: "
                     + ", ".join(c["name"] for c in top)}
 
@@ -85,6 +86,7 @@ def _budget_roundup(cur: dict) -> dict | None:
     if total < MIN_DELTA_ILS:
         return None
     return {"kind": "budget_roundup", "tone": "bad", "score": 70 + len(over),
+            "link": {"view": "cats", "month": cur["key"]},
             "text": f"{len(over)} מתוך {len(with_budget)} קטגוריות מעל התקציב — "
                     f"{_ils(total)} חריגה מצטברת"}
 
@@ -95,6 +97,8 @@ def _uncategorized(cur: dict) -> dict | None:
     if len(rows) < 5:
         return None
     return {"kind": "uncategorized", "tone": "neutral", "score": 40 + len(rows) / 10,
+            "link": {"view": "txns", "month": cur["key"], "uncat": True,
+                     "label": "תנועות שלא סווגו"},
             "text": f"{len(rows)} תנועות עדיין לא סווגו ({_ils(sum(t[4] for t in rows))}) — "
                     f"סיווג שלהן ידייק את התקציבים"}
 
@@ -114,8 +118,8 @@ def _recurring(months: list[dict], cur_key: str) -> dict | None:
             per_merchant.setdefault(t[11], {}).setdefault(m["key"], 0.0)
             per_merchant[t[11]][m["key"]] += t[4]
 
-    monthly, count = 0.0, 0
-    for by_month in per_merchant.values():
+    monthly, keys = 0.0, []
+    for key, by_month in per_merchant.items():
         if len(by_month) < 2:
             continue
         vals = sorted(by_month.values())
@@ -124,11 +128,17 @@ def _recurring(months: list[dict], cur_key: str) -> dict | None:
         if vals[0] <= 0 or vals[-1] > vals[0] * 1.15:
             continue
         monthly += vals[len(vals) // 2]
-        count += 1
-    if count < 3 or monthly < MIN_BASE_ILS:
+        keys.append(key)          # kept so the drill-down can show exactly these merchants
+    if len(keys) < 3 or monthly < MIN_BASE_ILS:
         return None
     return {"kind": "recurring", "tone": "neutral", "score": 85,
-            "text": f"{count} חיובים קבועים חוזרים כל חודש — {_ils(monthly)} בחודש, "
+            # Lands on the CURRENT month — "what am I paying now". The headline is a
+            # cross-month median, so a merchant that has not billed yet this month will
+            # not appear; the chip names the filter, so the table reads as "these
+            # merchants" rather than as a restatement of the monthly total.
+            "link": {"view": "txns", "month": cur_key, "merchants": keys,
+                     "label": "חיובים קבועים"},
+            "text": f"{len(keys)} חיובים קבועים חוזרים כל חודש — {_ils(monthly)} בחודש, "
                     f"{_ils(monthly * 12)} בשנה"}
 
 
@@ -139,6 +149,7 @@ def _mom_totals(cur: dict | None, finished: list[dict]) -> dict | None:
         delta = cur["spent"] - finished[-1]["spent"]
         if delta >= MIN_DELTA_ILS:
             return {"kind": "mom_totals", "tone": "bad", "score": 80,
+                    "link": {"view": "txns", "month": cur["key"]},
                     "text": f"כבר הוצאתם {_ils(delta)} יותר מאשר בכל {_short(finished[-1])}"}
     if len(finished) >= 2:
         prev, last = finished[-2], finished[-1]
@@ -146,6 +157,7 @@ def _mom_totals(cur: dict | None, finished: list[dict]) -> dict | None:
         if abs(delta) < MIN_DELTA_ILS:
             return None
         return {"kind": "mom_totals", "tone": "bad" if delta > 0 else "good", "score": 50,
+                "link": {"view": "txns", "month": last["key"]},
                 "text": f"ב{_short(last)} הוצאתם {_ils(abs(delta))} "
                         f"{'יותר' if delta > 0 else 'פחות'} מאשר ב{_short(prev)}"}
     return None
@@ -175,6 +187,7 @@ def _category_move(finished: list[dict]) -> dict | None:
     pct, c, delta = best
     return {"kind": "category_move", "tone": "bad" if delta > 0 else "good",
             "score": 60 + min(pct, 100) / 10,
+            "link": {"view": "txns", "month": target["key"], "cat": c["name"]},
             "text": f"{c['name']} ב{_short(target)}: {_ils(c['actual'])} — "
                     f"{round(pct)}% {'מעל' if delta > 0 else 'מתחת'} לממוצע שלכם"}
 
@@ -197,6 +210,8 @@ def _new_merchant(cur: dict | None, finished: list[dict], cur_key: str) -> dict 
     if total < MIN_DELTA_ILS:
         return None
     return {"kind": "new_merchant", "tone": "neutral", "score": 75,
+            "link": {"view": "txns", "month": cur["key"], "merchants": list(fresh),
+                     "label": "מקורות הוצאה חדשים"},
             "text": f"{len(fresh)} מקורות הוצאה חדשים החודש — הגדול שבהם: {name} ({_ils(total)})"}
 
 
@@ -210,6 +225,7 @@ def _income_record(months: list[dict], cur_key: str) -> dict | None:
         return None
     best = max(with_income, key=lambda m: m["income"])
     return {"kind": "income_record", "tone": "good", "score": 65,
+            "link": {"view": "txns", "month": best["key"], "flow": "in"},
             "text": f"{best['label']} היה חודש ההכנסה הגבוהה ביותר — {_ils(best['income'])}"}
 
 
@@ -223,6 +239,7 @@ def _savings_streak(finished: list[dict]) -> dict | None:
     if streak < 2:
         return None
     return {"kind": "savings_streak", "tone": "good", "score": 55 + streak,
+            "link": {"view": "trends"},
             "text": f"{streak} חודשים ברציפות בחיסכון — {_ils(total)} סה״כ"}
 
 

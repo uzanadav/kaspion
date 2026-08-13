@@ -279,6 +279,10 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .ins-dot { width:7px; height:7px; border-radius:50%; flex:none; background:var(--ink-3) }
 .ins.good .ins-dot { background:var(--pos) }
 .ins.bad .ins-dot  { background:var(--neg) }
+.ins.go { cursor:pointer }
+.ins.go:hover { background:var(--surface-2) }
+.ins-txt { flex:1; min-width:0 }
+.ins-go { color:var(--ink-3); font-size:var(--t4); flex:none }
 .panel { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
         padding:var(--s4); box-shadow:var(--shadow) }
 
@@ -659,6 +663,9 @@ let selCat = null;
 let flow = 'all';               // money direction shown: all | out (spend) | in (income)
 let sort = { k: 0, dir: -1 };   // default: date, newest first
 let theme = 'auto';             // auto | light | dark
+// insight drill-down. selCat/flow/mi already cover category, direction and month; this
+// covers the two things they cannot express: an explicit merchant set, and "still ❔".
+let pick = null;   // { merchants: [...], uncat: bool, label: '...' } | null
 
 /* ---------- keep your place across the reload every edit triggers ---------- */
 // Saving a category rebuilds the page and reloads it; without this you'd be thrown
@@ -668,7 +675,7 @@ function saveUi() {
   try {
     sessionStorage.setItem(UI_KEY, JSON.stringify({
       view, month: DATA.months[mi] ? DATA.months[mi].key : null,
-      selCat, sort, flow, search: $('s') ? $('s').value : '', theme,
+      selCat, sort, flow, search: $('s') ? $('s').value : '', theme, pick,
     }));
   } catch (e) { /* private mode — never fail an edit over bookkeeping */ }
 }
@@ -686,6 +693,11 @@ function restoreUi() {
   if (saved.sort && typeof saved.sort.k === 'number') sort = saved.sort;
   if (saved.search && $('s')) $('s').value = saved.search;
   if (['auto', 'light', 'dark'].includes(saved.theme)) theme = saved.theme;
+  // a drill-down must survive the reload an edit triggers, or fixing a category from
+  // inside one silently dumps you back to the whole month
+  if (saved.pick && (Array.isArray(saved.pick.merchants) || saved.pick.uncat)) {
+    pick = saved.pick;
+  }
 }
 function applyTheme() {
   document.documentElement.dataset.theme = theme === 'auto' ? '' : theme;
@@ -848,6 +860,29 @@ function renderSources() {
   }).join('') || '<div class="hint">אין עדיין נתונים</div>';
 }
 
+function openInsight(link) {
+  if (!link || !VIEWS[link.view]) return;
+  // resolve the month by KEY, never by a stored index: importing a statement adds months
+  // and shifts every index underneath us
+  if (link.month) {
+    const idx = DATA.months.findIndex(m => m.key === link.month);
+    if (idx >= 0) mi = idx;
+  }
+  // Reset every filter the link does not set. gotoCat() skips this and leaves a stale
+  // search box narrowing the result; here that bug would hide the very rows the insight
+  // is pointing at, which is the whole point of the click.
+  selCat = link.cat || null;
+  flow = link.flow || 'all';
+  pick = (link.merchants || link.uncat)
+    ? { merchants: link.merchants || [], uncat: !!link.uncat, label: link.label || '' }
+    : null;
+  if ($('s')) $('s').value = '';
+  view = link.view;
+  applyView();
+  render();
+  window.scrollTo({ top: 0 });
+}
+
 function renderInsights() {
   // Insights describe the whole history, not the month chip that happens to be selected,
   // so they are rendered straight from DATA and never re-filtered per month.
@@ -859,9 +894,15 @@ function renderInsights() {
   // month name renders reversed — the bug that started the redesign
   const nums = s => s.replace(/₪[\d,]+|\d[\d,]*(?:\.\d+)?%?/g,
                               t => `<span class="num">${t}</span>`);
-  box.innerHTML = items.map(i =>
-    `<div class="ins ${i.tone}"><span class="ins-dot"></span>${nums(esc(i.text))}</div>`
+  box.innerHTML = items.map((i, n) =>
+    `<div class="ins ${i.tone}${i.link ? ' go' : ''}" data-n="${n}"${
+       i.link ? ' title="לחצו כדי לראות את התנועות שמאחורי התובנה"' : ''
+     }><span class="ins-dot"></span><span class="ins-txt">${nums(esc(i.text))}</span>${
+       i.link ? '<span class="ins-go">‹</span>' : ''}</div>`
   ).join('');
+  // insights without a link stay inert rather than looking clickable and doing nothing
+  box.querySelectorAll('.ins.go').forEach(el =>
+    el.onclick = () => openInsight(items[+el.dataset.n].link));
 }
 
 function renderOverview(m) {
@@ -963,12 +1004,17 @@ function renderCats(m) {
 function gotoCat(name) {
   if (name === 'אחרים') return;
   selCat = name;
+  // clears any insight drill-down (openInsight sets `pick`) — this is a fresh, independent
+  // navigation, not a refinement of one, and a leftover merchant filter would silently
+  // intersect with it and hide rows the category actually contains
+  pick = null;
   document.querySelector('#side nav a[data-v="txns"]').click();
 }
 
 function renderChip() {
-  $('chip').className = 'chip' + (selCat ? ' on' : '');
-  $('chip').textContent = selCat ? `מציג רק: ${selCat} ✕` : '';
+  const labels = [pick && pick.label, selCat].filter(Boolean);
+  $('chip').className = 'chip' + (labels.length ? ' on' : '');
+  $('chip').textContent = labels.length ? `מציג רק: ${labels.join(' · ')} ✕` : '';
 }
 
 function renderTxns() {
@@ -980,6 +1026,9 @@ function renderTxns() {
   const rows = m.txns
     .filter(t => flow === 'all' || (flow === 'in' ? t[10] : !t[10]))
     .filter(t => !selCat || t[3] === selCat)
+    // t[11] is merchant_key, t[5] the '🤖'/'✅'/'❔' glyph — see _collect()'s row layout
+    .filter(t => !pick || (pick.uncat ? (t[5] === '❔' && !t[10])
+                                      : pick.merchants.includes(t[11])))
     // search matches merchant, category, and the card it came from ("מקס", "ישראכרט"…)
     .filter(t => !v || t[2].includes(v) || t[3].includes(v) || issuerOf(t[8]).label.includes(v))
     .sort((a, b) => {
@@ -1026,7 +1075,7 @@ document.querySelectorAll('#t th.sortable').forEach(th => th.onclick = () => {
   sort = { k, dir: sort.k === k ? -sort.dir : (k === 4 ? -1 : 1) };
   renderTxns();
 });
-$('chip').onclick = () => { selCat = null; renderChip(); renderTxns(); };
+$('chip').onclick = () => { selCat = null; pick = null; renderChip(); renderTxns(); };
 document.querySelectorAll('#fseg button').forEach(b => b.onclick = () => {
   flow = b.dataset.f;
   document.querySelectorAll('#fseg button').forEach(x => x.classList.toggle('on', x === b));
