@@ -51,7 +51,15 @@ if __name__ == "__main__":
     import getpass
 
     print(f"known companies: {', '.join(COMPANY_FIELDS)}")
+    # start from what's already saved and MERGE — adding a second institution must
+    # never silently wipe the first one (save_credentials rewrites the whole file).
     creds: dict = {}
+    if CRED_FILE.exists():
+        try:
+            creds = load_credentials()
+            print(f"already saved: {', '.join(creds)} (re-entering one replaces just that one)")
+        except Exception:  # noqa: BLE001 - unreadable blob shouldn't block re-entry
+            print("warning: existing credentials could not be read — they will be replaced")
     while True:
         company = input("company id (empty to finish): ").strip()
         if not company:

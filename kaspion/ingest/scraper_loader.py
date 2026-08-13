@@ -17,22 +17,47 @@ SCRAPER_DIR = Path(__file__).resolve().parents[2] / "scraper"
 def load_from_scraper(days_back: int = 60) -> int:
     creds = load_credentials()
     all_rows: list[dict] = []
+    failures: list[str] = []
+    succeeded = 0
     for company, cfg in creds.items():
-        proc = subprocess.run(
-            ["node", "scrape.js"],
-            cwd=SCRAPER_DIR,
-            env=dict(
-                os.environ,
-                KASPION_COMPANY=company,
-                KASPION_CREDENTIALS=json.dumps(cfg["credentials"]),
-                KASPION_ACCOUNT_TYPE=cfg["type"],
-                KASPION_START_DATE=(date.today() - timedelta(days=days_back)).isoformat(),
-            ),
-            capture_output=True,
-            text=True,
-            check=True,
+        # never let one bank's outage throw away another's data: a failure here is
+        # reported and skipped, and whatever did scrape still gets ingested below.
+        try:
+            proc = subprocess.run(
+                ["node", "scrape.js"],
+                cwd=SCRAPER_DIR,
+                env=dict(
+                    os.environ,
+                    KASPION_COMPANY=company,
+                    KASPION_CREDENTIALS=json.dumps(cfg["credentials"]),
+                    KASPION_ACCOUNT_TYPE=cfg["type"],
+                    KASPION_START_DATE=(date.today() - timedelta(days=days_back)).isoformat(),
+                ),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            rows = json.loads(proc.stdout)
+        except subprocess.CalledProcessError as e:
+            # stderr is the scraper's own {error, message} json — never contains credentials
+            failures.append(f"{company}: {(e.stderr or '').strip()[:200] or 'scraper failed'}")
+            continue
+        except json.JSONDecodeError:
+            failures.append(f"{company}: scraper returned unreadable output")
+            continue
+        print(f"      · {company}: {len(rows)} transactions")
+        succeeded += 1
+        all_rows.extend(rows)
+
+    for f in failures:
+        print(f"      ⚠ {f}")
+    # Only a total wipe-out is fatal. Keying this off `all_rows` instead would abort a
+    # run where one bank succeeded but legitimately had nothing new — falsely claiming
+    # every institution failed, and throwing away the run this isolation exists to save.
+    if failures and succeeded == 0:
+        raise RuntimeError(
+            "all configured institutions failed to scrape:\n  " + "\n  ".join(failures)
         )
-        all_rows.extend(json.loads(proc.stdout))
 
     _assign_ids(all_rows)
     con = connect()

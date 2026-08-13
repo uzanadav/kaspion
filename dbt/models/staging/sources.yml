@@ -15,3 +15,4 @@ sources:
       - name: merchant_overrides
       - name: budgets
       - name: excluded_transactions
+      - name: categories

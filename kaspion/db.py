@@ -43,28 +43,20 @@ CREATE TABLE IF NOT EXISTS state.budgets (
     effective_from     DATE NOT NULL DEFAULT current_date
 );
 
+-- categories the household adds from the dashboard. The built-in list stays in the
+-- dbt seed; this table only ever ADDS to it, and lives in state.* so a
+-- `dbt build --full-refresh` can never wipe it (same rule as budgets/overrides).
+CREATE TABLE IF NOT EXISTS state.categories (
+    category_id TEXT PRIMARY KEY,
+    name_he     TEXT NOT NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
 CREATE TABLE IF NOT EXISTS state.excluded_transactions (
     transaction_id TEXT PRIMARY KEY,
     excluded_at    TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
 """
-
-# Starting budgets (ILS/month) — the owner tunes these via `kaspion set-budget`.
-DEFAULT_BUDGETS = {
-    "groceries": 3000, "restaurants": 1500, "transport": 1200, "housing": 8500,
-    "kids": 3500, "health": 600, "entertainment": 800, "clothing": 600,
-    "electronics": 500, "subscriptions": 150, "insurance": 900, "gifts": 300, "other": 500,
-}
-
-
-def seed_default_budgets(con: duckdb.DuckDBPyConnection) -> None:
-    if con.execute("SELECT count(*) FROM state.budgets").fetchone()[0] == 0:
-        for cat, amt in DEFAULT_BUDGETS.items():
-            con.execute(
-                "INSERT INTO state.budgets (category_id, monthly_amount_ils) VALUES (?, ?)",
-                [cat, amt],
-            )
-
 
 def connect(read_only: bool = False) -> duckdb.DuckDBPyConnection:
     """Open the household database.
@@ -77,5 +69,4 @@ def connect(read_only: bool = False) -> duckdb.DuckDBPyConnection:
     DB_PATH.parent.mkdir(exist_ok=True)
     con = duckdb.connect(str(DB_PATH))
     con.execute(DDL)
-    seed_default_budgets(con)
     return con

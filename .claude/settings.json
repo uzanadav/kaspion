@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./data/.kaspion_key)",
+      "Read(./data/credentials.json.enc)",
+      "Read(./data/*.enc)",
+      "Read(//Users/nadavuzan/Desktop/kaspion/data/.kaspion_key)",
+      "Read(//Users/nadavuzan/Desktop/kaspion/data/credentials.json.enc)"
+    ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "denyRead": [
+        "./data/.kaspion_key",
+        "./data/credentials.json.enc"
+      ]
+    }
+  }
+}

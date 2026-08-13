@@ -8,15 +8,20 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 from datetime import date, datetime
 
-from kaspion.ai.providers import VALID_CATEGORIES
+from kaspion.ai.providers import VALID_CATEGORIES, valid_categories
 from kaspion.db import connect
 
 
 def recategorize(merchant: str, category: str) -> None:
-    if category not in VALID_CATEGORIES:
-        raise SystemExit(f"unknown category: {category}. valid: {', '.join(VALID_CATEGORIES)}")
+    allowed = valid_categories()
+    if category not in allowed:
+        # ValueError, never SystemExit: this runs inside the dashboard server too, and
+        # SystemExit is a BaseException that escapes its `except Exception` and takes
+        # the whole server down (reachable from a stale tab posting a deleted category)
+        raise ValueError(f"unknown category: {category}. valid: {', '.join(allowed)}")
     con = connect()
     # normalize exactly like stg_transactions.merchant_key
     key = con.execute(
@@ -36,9 +41,77 @@ def recategorize(merchant: str, category: str) -> None:
     print(f"override saved: '{key}' -> {category}. run `python3 sync.py --skip-categorize` to rebuild.")
 
 
+# 'other' is the fallback every uncategorized row lands on and 'income' is how
+# inflows are labelled — both are referenced by the SQL, so neither may be removed.
+STRUCTURAL_CATEGORIES = {"other", "income"}
+
+
+def add_category(category_id: str, name_he: str) -> None:
+    """Add a household category. Stored in state.categories, so dbt never wipes it."""
+    category_id = (category_id or "").strip().lower()
+    name_he = (name_he or "").strip()
+    if not re.fullmatch(r"[a-z][a-z0-9_]{1,29}", category_id):
+        raise ValueError(
+            "מזהה קטגוריה חייב להיות באנגלית קטנה, ספרות או קו תחתון (למשל: pets)"
+        )
+    if not name_he:
+        raise ValueError("צריך שם לקטגוריה")
+    # check the seed CSV rather than main.dim_category: dim_category's is_custom column
+    # only exists after a dbt build, and nothing on the add path guarantees one has run
+    if category_id in VALID_CATEGORIES:
+        raise ValueError(f"הקטגוריה '{category_id}' כבר קיימת ברשימה המובנית")
+    con = connect()
+    con.execute(
+        """
+        INSERT INTO state.categories (category_id, name_he) VALUES (?, ?)
+        ON CONFLICT (category_id) DO UPDATE SET name_he = excluded.name_he
+        """,
+        [category_id, name_he],
+    )
+    con.close()
+
+
+def delete_category(category_id: str) -> int:
+    """Remove an owner-added category. Returns how many merchants were moved.
+
+    Anything still pointing at it is reassigned to 'other' FIRST: a transaction left
+    referencing a category that no longer exists would break the relationships test
+    between fct_spend and dim_category and fail the whole build.
+    """
+    category_id = (category_id or "").strip().lower()
+    if category_id in STRUCTURAL_CATEGORIES:
+        raise ValueError(f"אי אפשר למחוק את '{category_id}' — המערכת משתמשת בה")
+    con = connect()
+    custom = con.execute(
+        "SELECT count(*) FROM state.categories WHERE category_id = ?", [category_id]
+    ).fetchone()[0]
+    if not custom:
+        con.close()
+        raise ValueError("אפשר למחוק רק קטגוריות שהוספתם — הקטגוריות המובנות קבועות")
+    moved = con.execute(
+        "SELECT count(*) FROM state.merchant_overrides WHERE category_id = ?", [category_id]
+    ).fetchone()[0]
+    con.execute(
+        "UPDATE state.merchant_overrides SET category_id = 'other' WHERE category_id = ?",
+        [category_id],
+    )
+    con.execute(
+        "UPDATE state.ai_proposals SET proposed_category_id = 'other' WHERE proposed_category_id = ?",
+        [category_id],
+    )
+    con.execute("DELETE FROM state.budgets WHERE category_id = ?", [category_id])
+    con.execute("DELETE FROM state.categories WHERE category_id = ?", [category_id])
+    con.close()
+    return moved
+
+
 def set_budget(category: str, amount: float) -> None:
-    if category not in VALID_CATEGORIES:
-        raise SystemExit(f"unknown category: {category}. valid: {', '.join(VALID_CATEGORIES)}")
+    allowed = valid_categories()
+    if category not in allowed:
+        # ValueError, never SystemExit: this runs inside the dashboard server too, and
+        # SystemExit is a BaseException that escapes its `except Exception` and takes
+        # the whole server down (reachable from a stale tab posting a deleted category)
+        raise ValueError(f"unknown category: {category}. valid: {', '.join(allowed)}")
     con = connect()
     con.execute(
         """
@@ -57,7 +130,7 @@ def add_transaction(
 ) -> str:
     """Manually add an expense (positive amount in = negative outflow stored).
     Survives syncs: lives in raw.transactions with source='manual'."""
-    if category not in VALID_CATEGORIES:
+    if category not in valid_categories():
         raise ValueError(f"unknown category: {category}")
     posted = date_str or date.today().isoformat()
     datetime.strptime(posted, "%Y-%m-%d")  # validate
@@ -121,6 +194,11 @@ def main() -> None:
     x = sub.add_parser("remove", help="hide a transaction from all totals")
     x.add_argument("transaction_id")
     sub.add_parser("reset-sample-data", help="delete the synthetic seed data before going real")
+    ac = sub.add_parser("add-category", help="add a household category")
+    ac.add_argument("category_id", help="lowercase id, e.g. pets")
+    ac.add_argument("name", help="Hebrew display name")
+    dc = sub.add_parser("delete-category", help="delete a category you added")
+    dc.add_argument("category_id")
     args = p.parse_args()
     if args.cmd == "recategorize":
         recategorize(args.merchant, args.category)
@@ -134,7 +212,18 @@ def main() -> None:
         print("hidden. run `python3 sync.py --skip-categorize` to rebuild.")
     elif args.cmd == "reset-sample-data":
         reset_sample_data()
+    elif args.cmd == "add-category":
+        add_category(args.category_id, args.name)
+        print(f"category added: {args.category_id}. run `python3 sync.py --skip-categorize` to rebuild.")
+    elif args.cmd == "delete-category":
+        moved = delete_category(args.category_id)
+        print(f"category deleted ({moved} merchants moved to 'other'). rebuild to apply.")
 
 
 if __name__ == "__main__":
-    main()
+    # the command functions raise ValueError so the dashboard server can catch them;
+    # on the terminal that still has to look like a clean error, not a traceback
+    try:
+        main()
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None

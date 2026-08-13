@@ -8,24 +8,38 @@ Your financial data **never leaves your computer**. No cloud, no accounts, no te
 
 ## What it does
 
-Pulls your bank & credit-card transactions (Leumi / Max / Isracard via
-[israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers)), models them with
-dbt on DuckDB — detecting inter-account transfers and the monthly card debit (חיוב) so
-nothing is double-counted — categorizes merchants automatically (built-in Israeli merchant
-rules first, local AI via Ollama for the rest, your manual corrections always win and are
-remembered forever), and renders an interactive Hebrew dashboard: budgets with monthly
-pacing, per-category trends with target lines, savings tracking, and inline editing
-(recategorize, add expenses, hide transactions, set budgets) — all from the browser.
+Collects your bank & credit-card transactions — automatically via
+[israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers), or by dropping the
+monthly statement file onto the dashboard — models them with dbt on DuckDB, detecting
+inter-account transfers and the monthly card debit (חיוב) **so a card statement is never
+counted twice**, categorizes merchants automatically (built-in Israeli merchant rules first,
+local AI via Ollama for the rest, your manual corrections always win and are remembered
+forever), and renders an interactive Hebrew dashboard: income vs. spending, budgets with
+monthly pacing, per-category trends, savings tracking, and inline editing (recategorize, add
+expenses, hide transactions, set budgets, add categories) — all from the browser.
 
 ```
-bank/credit card ─▶ scraper ─▶ raw.transactions ─▶ dbt (staging → transfer & card-payment
-                                 (DuckDB)            detection → marts + budget pacing)
-                                                              │
+bank / credit card ─┬─ scraper (Node)      ─┐
+                    └─ statement upload     ├─▶ raw.transactions ─▶ dbt (staging → transfer &
+                       (.xlsx / .xls)      ─┘      (DuckDB)          card-debit detection →
+                                                              │      marts + budget pacing)
                               your overrides > Israeli merchant rules > local AI (Ollama)
                                                               │
                                                        dashboard.html
                                               (Hebrew · RTL · interactive · one file)
 ```
+
+### How each account gets in
+
+| Institution | Method | Why |
+|---|---|---|
+| **Max** | scraper, fully automatic (cron-able) | works |
+| **Isracard** | upload the monthly `.xlsx` from their site | their login is behind reCAPTCHA — see `docs/AGENT_HANDOFF.md` |
+| **ONE ZERO** | upload the `.xls` export from the app | needs one-time 2FA enrollment, not built yet |
+
+Uploading is on the **תנועות** page: pick one or more files and press טעינה. The file's bank
+is detected from its contents, re-uploading the same file never creates duplicates, and card
+debits inside a bank statement are automatically excluded from spending.
 
 ## Privacy: what's in this repo vs. what stays on your machine
 
@@ -101,14 +115,16 @@ each fix is permanent.
 | Path | What |
 |---|---|
 | `sync.py` | the one entrypoint: ingest → dbt → categorize → dashboard |
-| `kaspion/ingest/` | seed generator, scraper wrapper, credential encryption |
+| `kaspion/ingest/` | seed generator, scraper wrapper, statement importers, credential encryption |
+| `kaspion/ingest/statements.py` | upload dispatcher — detects the bank from the file itself |
 | `kaspion/ai/` | rules layer + providers: ollama (default) / claude / none |
 | `kaspion/report.py` | generates `dashboard.html` |
-| `kaspion/serve.py` | local edit server (add/hide/recategorize/budgets/sync button) |
+| `kaspion/serve.py` | local edit server (add/hide/recategorize/budgets/categories/upload/sync) |
 | `kaspion/cli.py` | terminal equivalents |
 | `dbt/` | staging → intermediate → marts, all tests |
 | `evals/` | hand-labeled ground truth for categorization accuracy |
 | `scraper/` | Node wrapper around israeli-bank-scrapers |
+| `docs/AGENT_HANDOFF.md` | **read first if you're an AI agent** — state, invariants, known traps |
 | `docs/` | how it works, scraper setup, full spec & build plan |
 
 ## Before pushing your fork (privacy self-check)

@@ -21,28 +21,31 @@ KNOWN: dict[str, str] = {
     # transport & fuel
     "פז ": "transport", "סונול": "transport", "דור אלון": "transport",
     "רב קו": "transport", "פנגו": "transport", "pango": "transport",
-    "gett": "transport", "yango": "transport", "חניון": "transport",
+    "gett": "transport", "yango": "transport", "חניון": "transport", "חנייה": "transport",
     "cellopark": "transport", "רכבת ישראל": "transport", "דלק מנטה": "transport",
+    "תחבורה רב": "transport", "דלק ": "transport",
     # housing & bills
     "חברת החשמל": "housing", "מי אביבים": "housing", "מקורות": "housing",
     "ארנונה": "housing", "ועד בית": "housing", "שכר דירה": "housing",
     "אמישראגז": "housing", "סופרגז": "housing", "בזק": "housing",
-    "hot ": "housing", "פרטנר": "housing", "סלקום": "housing",
+    "hot ": "housing", "פרטנר": "housing", "סלקום": "housing", "הכל לבנין": "housing",
     # health
     "סופר פארם": "health", "גוד פארם": "health", "מכבי": "health",
     "כללית": "health", "לאומית": "health", "מאוחדת": "health", "בית מרקחת": "health",
+    "דראגסטור": "health",
     # subscriptions
     "netflix": "subscriptions", "spotify": "subscriptions", "icloud": "subscriptions",
     "youtube": "subscriptions", "apple.com": "subscriptions", "disney": "subscriptions",
     "google one": "subscriptions", "chatgpt": "subscriptions", "claude.ai": "subscriptions",
     # entertainment
     "סינמה סיטי": "entertainment", "יס פלנט": "entertainment", "רב חן": "entertainment",
+    "גן החיות": "entertainment", "איוונטר": "entertainment",
     # clothing
     "zara": "clothing", "h&m": "clothing", "קסטרו": "clothing", "פוקס": "clothing",
     "רנואר": "clothing", "טרמינל": "clothing", "גולף": "clothing",
     # electronics
-    "ksp": "electronics", "באג": "electronics", "אייבורי": "electronics",
-    "lastprice": "electronics",
+    "ksp": "electronics", "קיי אס פי": "electronics", "באג": "electronics",
+    "אייבורי": "electronics", "lastprice": "electronics",
     # insurance
     "הפניקס": "insurance", "הראל ביטוח": "insurance", "מגדל ביטוח": "insurance",
     "כלל ביטוח": "insurance", "מנורה": "insurance", "ביטוח ישיר": "insurance",
@@ -53,8 +56,11 @@ KNOWN: dict[str, str] = {
 
 
 def match(merchant_key: str) -> str | None:
-    """Return the category for a known merchant, or None if we don't know it."""
+    """Return the category for a known merchant, or None if we don't know it.
+    Padded with spaces so a trailing-space keyword (e.g. "פז ") still matches when
+    it's also the very end of the merchant key, not just followed by more text."""
+    padded = f" {merchant_key} "
     for keyword, category in KNOWN.items():
-        if keyword in merchant_key:
+        if keyword in padded:
             return category
     return None

@@ -8,12 +8,28 @@ from typing import Protocol
 
 import requests
 
-# single source of truth for categories: the dbt seed the dashboard is built on.
-# add a category there and every layer (AI, CLI, UI) picks it up automatically.
+# Built-in categories live in the dbt seed the dashboard is built on. Categories the
+# household adds from the dashboard live in state.categories. VALID_CATEGORIES stays
+# as the seed-only list so importing this module never needs a database; call
+# valid_categories() wherever owner-added categories must count too.
 _CATEGORY_SEED = Path(__file__).resolve().parents[2] / "dbt" / "seeds" / "dim_category_seed.csv"
 VALID_CATEGORIES = [
     row["category_id"] for row in csv.DictReader(_CATEGORY_SEED.open(encoding="utf-8"))
 ]
+
+
+def valid_categories() -> list[str]:
+    """Seed categories plus any the owner added. Falls back to the seed alone if the
+    database isn't reachable yet (first run, or a read during a rebuild)."""
+    try:
+        from kaspion.db import connect
+
+        con = connect()
+        extra = [r[0] for r in con.execute("SELECT category_id FROM state.categories").fetchall()]
+        con.close()
+    except Exception:  # noqa: BLE001 - the seed list is always a usable answer
+        return list(VALID_CATEGORIES)
+    return VALID_CATEGORIES + [c for c in extra if c not in VALID_CATEGORIES]
 
 PROMPT = """You categorize Israeli household transactions. Merchants may be Hebrew or English.
 Return ONLY a JSON object. Keys: EXACTLY the merchant strings given below, unchanged.
@@ -51,7 +67,7 @@ class OllamaProvider:
 
     def categorize(self, merchants: list[str]) -> dict[str, str]:
         prompt = PROMPT.format(
-            categories=", ".join(VALID_CATEGORIES), merchants="\n".join(merchants)
+            categories=", ".join(valid_categories()), merchants="\n".join(merchants)
         )
         resp = requests.post(
             f"{self.host}/api/chat",
@@ -81,7 +97,7 @@ class ClaudeProvider:
 
         client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
         prompt = PROMPT.format(
-            categories=", ".join(VALID_CATEGORIES), merchants="\n".join(merchants)
+            categories=", ".join(valid_categories()), merchants="\n".join(merchants)
         )
         msg = client.messages.create(
             model=self.model,
@@ -105,7 +121,8 @@ class NoneProvider:
 
 def _clean(raw: dict[str, str], merchants: list[str]) -> dict[str, str]:
     """Keep only known merchants mapped to valid categories."""
-    return {m: raw[m] for m in merchants if raw.get(m) in VALID_CATEGORIES}
+    allowed = set(valid_categories())
+    return {m: raw[m] for m in merchants if raw.get(m) in allowed}
 
 
 def get_provider() -> Provider:

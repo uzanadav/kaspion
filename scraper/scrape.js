@@ -11,7 +11,9 @@ const scraper = createScraper({
   companyId: CompanyTypes[companyId] ?? companyId,
   startDate,
   combineInstallments: false,
-  showBrowser: false,
+  // KASPION_SHOW_BROWSER=1 opens a visible browser for debugging a failing login —
+  // the only way to see a verification/OTP step the library can't report back.
+  showBrowser: process.env.KASPION_SHOW_BROWSER === "1",
 });
 
 const result = await scraper.scrape(credentials);
@@ -32,7 +34,10 @@ for (const account of result.accounts) {
       // VERIFY the sign convention per institution after the first real scrape;
       // if a source reports charges as positive, negate HERE, never downstream.
       amount: txn.chargedAmount,
-      currency: txn.originalCurrency || "ILS",
+      // chargedAmount is always in the account's own currency (ILS for Israeli cards),
+      // even when the underlying purchase was foreign — never tag it with originalCurrency,
+      // that describes txn.originalAmount (unused here), not chargedAmount.
+      currency: "ILS",
       raw_description: txn.description,
       source: companyId,
     });

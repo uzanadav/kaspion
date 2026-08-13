@@ -110,7 +110,8 @@ crontab -e
 |---|---|
 | `INVALID_PASSWORD` | credentials typo — rerun `python3 -m kaspion.ingest.crypto` |
 | `CHANGE_PASSWORD` | the bank forces a password change — do it on their site first |
-| Login hangs / captcha | banks sometimes challenge automation; retry later, or run with `showBrowser: true` in `scraper/scrape.js` to see what's happening |
+| Login hangs / captcha | banks sometimes challenge automation; retry later, or watch it happen with `KASPION_SHOW_BROWSER=1 python3 sync.py --source scraper` |
+| `INVALID_PASSWORD` but the same credentials work in your browser | the library reports every non-success login code as `INVALID_PASSWORD`. Isracard/Amex in particular are known to block automated logins (bot detection / Cloudflare WAF). Run with `KASPION_SHOW_BROWSER=1` to see whether a block page or verification step is what's actually returned. |
 | 2FA / OTP prompt | some accounts require SMS codes; israeli-bank-scrapers has limited OTP support per bank — check its README for your institution |
 | Duplicate transactions | shouldn't happen (dedup by transaction id) — if it does, the institution changed its id format; check `_assign_ids` in `kaspion/ingest/scraper_loader.py` |
 

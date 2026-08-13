@@ -37,27 +37,64 @@ def _collect() -> dict:
 
     pacing = q("""
         select strftime(p.posted_month, '%Y-%m'), c.name_he, p.actual_ils, p.budget_ils,
-               p.budget_to_date_ils, p.pace_status, p.category_id
+               p.budget_to_date_ils, p.pace_status, p.category_id, p.budget_is_suggested
         from main.fct_budget_pacing p join main.dim_category c using (category_id)
         where p.category_id != 'income'
         order by p.actual_ils desc
     """)
+    # The list shows money BOTH ways, so it comes from int_categorized rather than
+    # fct_spend (outflows only). The exclusions are kept identical to fct_spend's, or
+    # the page would show transfers and card debits the totals deliberately leave out.
     txns = q("""
-        select strftime(posted_month, '%Y-%m'), strftime(posted_date, '%Y-%m-%d'),
-               strftime(posted_date, '%d.%m'), raw_description, c.name_he, spend_ils,
-               case category_source when 'ai' then '🤖' when 'override' then '✅' else '❔' end,
-               f.transaction_id, f.category_id
-        from main.fct_spend f join main.dim_category c using (category_id)
-        order by posted_date desc
+        select strftime(t.posted_month, '%Y-%m'), strftime(t.posted_date, '%Y-%m-%d'),
+               strftime(t.posted_date, '%d.%m'), t.raw_description, c.name_he, abs(t.amount),
+               case t.category_source when 'ai' then '🤖' when 'override' then '✅' else '❔' end,
+               t.transaction_id, t.category_id,
+               -- account_id is '<issuer>-<last digits>' (e.g. 'max-1234'); the prefix is
+               -- the institution the charge came from, which the UI badges per row
+               split_part(t.account_id, '-', 1) as issuer,
+               t.account_id,
+               case when t.amount > 0 then 1 else 0 end as is_income
+        from main.int_categorized t join main.dim_category c using (category_id)
+        where not t.is_transfer
+          and not t.is_card_payment
+          and t.transaction_id not in (select transaction_id from state.excluded_transactions)
+        order by t.posted_date desc
     """)
     categories = q("""
-        select category_id, name_he from main.dim_category
+        select category_id, name_he, is_custom from main.dim_category
         where category_id != 'income' order by name_he
+    """)
+    # Same exclusions as the transactions list and fct_spend. Without the
+    # excluded_transactions filter, hiding a bogus inflow with 🗑 would remove it from
+    # the list while leaving it inside "הכנסות", the savings figure and the banner —
+    # with no way for the household to correct the number.
+    # freshness per data source: which accounts are up to date and which have gone
+    # stale is otherwise invisible — a scraper that quietly stopped working looks
+    # exactly like a month with no spending.
+    sources = q("""
+        select source,
+               min(account_id),
+               count(*),
+               strftime(min(posted_date), '%d.%m.%Y'),
+               strftime(max(posted_date), '%d.%m.%Y'),
+               strftime(max(ingested_at), '%d.%m.%Y %H:%M'),
+               -- staleness measured against the newest transaction that has actually
+               -- happened: statements carry future-dated rows (a September installment,
+               -- a card charge dated ahead), and those would otherwise mask a dead feed
+               coalesce(date_diff('day',
+                   max(case when posted_date <= current_date then posted_date end),
+                   current_date), 999)
+        from raw.transactions
+        group by 1 order by 1
     """)
     income = q("""
         select strftime(date_trunc('month', posted_date), '%Y-%m'), sum(amount)
         from main.int_categorized
-        where amount > 0 and not is_transfer
+        where amount > 0
+          and not is_transfer
+          and not is_card_payment
+          and transaction_id not in (select transaction_id from state.excluded_transactions)
         group by 1
     """)
     con.close()
@@ -70,16 +107,21 @@ def _collect() -> dict:
                   "toDate": 0.0, "income": 0.0, "cats": [], "txns": []}
         )
 
-    for key, name, actual, budget, to_date, status, cat_id in pacing:
+    for key, name, actual, budget, to_date, status, cat_id, suggested in pacing:
         m = month(key)
         actual, budget = float(actual), float(budget or 0)
         m["spent"] += actual
         m["budget"] += budget
         m["toDate"] += float(to_date or 0)
-        m["cats"].append({"id": cat_id, "name": name, "actual": actual, "budget": budget, "status": status})
+        m["cats"].append({
+            "id": cat_id, "name": name, "actual": actual, "budget": budget,
+            "status": status, "suggested": bool(suggested),
+        })
 
-    for key, iso, d, desc, cat, amt, src, txn_id, cat_id in txns:
-        month(key)["txns"].append([iso, d, desc, cat, float(amt), src, txn_id, cat_id])
+    for key, iso, d, desc, cat, amt, src, txn_id, cat_id, issuer, account, is_income in txns:
+        month(key)["txns"].append(
+            [iso, d, desc, cat, float(amt), src, txn_id, cat_id, issuer, account, int(is_income)]
+        )
 
     for key, inc in income:
         if key in months:
@@ -93,7 +135,10 @@ def _collect() -> dict:
         m["saved"] = round(m["income"] - m["spent"], 2)
     return {
         "months": ordered,
-        "categories": [{"id": c, "name": n} for c, n in categories],
+        "categories": [{"id": c, "name": n, "custom": bool(x)} for c, n, x in categories],
+        "sources": [{"src": s, "account": a, "n": n, "from": f, "to": t,
+                     "loaded": ld, "staleDays": int(sd)}
+                    for s, a, n, f, t, ld, sd in sources],
         "generated": datetime.now().strftime("%d.%m.%Y %H:%M"),
         "startKey": current_key if current_key in months else (ordered[-1]["key"] if ordered else ""),
     }
@@ -155,6 +200,15 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 14px; text-align:center }
 .card .lbl { font-size:.8rem; color:var(--soft) }
 .card .val { font-size:1.45rem; font-weight:700; margin-top:4px }
+/* money coming in gets its own accent so the two halves of the month read at a glance */
+.card.in { background:linear-gradient(180deg,#f2faf6,var(--card)); border-color:#cfe9dc }
+.card.in .val { color:var(--green) }
+.card .sub2 { font-size:.68rem; color:var(--soft); margin-top:3px; min-height:1em }
+/* the pace now rides in the spend card's subline, so it needs its own colour rule —
+   .good/.bad elsewhere are scoped to .val/.tsave and would not apply here */
+.card .sub2 .good { color:var(--green); font-weight:600 }
+.card .sub2 .bad  { color:var(--red);   font-weight:600 }
+@media (max-width:900px) { .cards { grid-template-columns:repeat(2,1fr) } }
 .val.good { color:var(--green) } .val.bad { color:var(--red) }
 .banner { margin:14px 0 0; padding:13px 16px; border-radius:14px; font-weight:600; font-size:.95rem }
 .banner.good { background:#e7f6ee; color:#116646 } .banner.bad { background:#fdebec; color:#a12b30 }
@@ -177,6 +231,8 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .cat:hover { background:var(--bg) }
 .cat-line { display:flex; justify-content:space-between; font-size:.92rem; margin-bottom:5px }
 .cat-amt small { color:var(--soft); font-weight:400 }
+.sugg-tag { font-size:.62rem; font-weight:600; color:#8a6d3b; background:var(--accent);
+        padding:1px 7px; border-radius:8px; margin-inline-start:6px; cursor:help }
 /* progress fill anchors to the RIGHT and grows leftward (natural for Hebrew) */
 .bar { height:9px; background:var(--line); border-radius:6px; overflow:hidden;
        display:flex; justify-content:flex-start }
@@ -185,31 +241,63 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 /* ---- trends ---- */
 .trend { display:flex; gap:8px; align-items:flex-end; justify-content:space-between; padding-top:8px }
 .tcol { flex:1; text-align:center; cursor:pointer }
-.tbar { background:var(--accent); border-radius:6px 6px 0 0; transition:background .15s }
+/* the bar grows from the baseline; the income marker floats over the same scale */
+.tplot { position:relative; display:flex; align-items:flex-end }
+.tbar { width:100%; background:var(--accent); border-radius:6px 6px 0 0; transition:background .15s }
+/* income as a rule across the column: spend below it = living within your means */
+.tinc { position:absolute; left:0; right:0; border-top:2px dashed var(--green);
+        pointer-events:none }
+/* .over = spent more than came in that month */
+.tinc.over { border-top-color:var(--red) }
+.tinc span { position:absolute; inset-inline-end:2px; top:-13px; font-size:.6rem;
+        font-weight:600; color:var(--green); background:var(--card); padding:0 3px;
+        border-radius:4px }
+.tinc.over span { color:var(--red) }
 .tcol:hover .tbar { background:#c5ae82 }
 .tcol.sel .tbar { background:var(--green) }
 .tval { font-size:.62rem; color:var(--soft); margin-bottom:3px }
 .tlab { font-size:.72rem; color:var(--soft); margin-top:5px }
 .tcol.sel .tlab { color:var(--green); font-weight:700 }
+/* what the month actually kept: the gap between the income rule and the bar.
+   Only rendered when income exists — a month with no income loaded would
+   otherwise read as a huge overspend when it is really just missing data. */
+.tsave { font-size:.78rem; font-weight:700; margin-top:2px; letter-spacing:.2px }
+.tsave.good { color:var(--green) }
+.tsave.bad { color:var(--red) }
 .pos { color:var(--green); font-weight:600 } .neg { color:var(--red); font-weight:600 }
 
 /* ---- per-category trend cards ---- */
 .catgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:12px }
 .catcard { background:var(--card); border:1px solid var(--line); border-radius:14px;
-        padding:13px 14px; cursor:pointer; transition:border-color .15s }
+        padding:14px 16px; cursor:pointer; transition:border-color .15s }
 .catcard:hover { border-color:var(--accent) }
-.cc-head { display:flex; justify-content:space-between; align-items:center; font-size:.9rem; font-weight:600 }
-.badge { font-size:.66rem; font-weight:600; padding:2px 9px; border-radius:10px; white-space:nowrap }
+.cc-head { display:flex; justify-content:space-between; align-items:center; font-size:1rem; font-weight:600 }
+.badge { font-size:.74rem; font-weight:600; padding:3px 10px; border-radius:10px; white-space:nowrap }
 .badge.ok  { background:#e7f6ee; color:#116646 }
 .badge.mid { background:#fdf3e0; color:#8a5a00 }
 .badge.bad { background:#fdebec; color:#a12b30 }
-.cc-bars { display:flex; gap:4px; align-items:flex-end; height:52px; margin-top:10px; position:relative }
-.mb { flex:1; border-radius:3px 3px 0 0; min-height:3px }
+.cc-chart { display:flex; gap:8px; align-items:flex-start; margin-top:12px }
+/* the month row lives inside the plot so it lines up with the bars automatically,
+   instead of being nudged by hand to clear the axis gutter */
+.cc-plot { flex:1; min-width:0; display:flex; flex-direction:column }
+.cc-axis { flex:none; height:68px; position:relative; display:flex; flex-direction:column;
+        justify-content:space-between; align-items:flex-end; font-size:.64rem;
+        color:var(--soft); white-space:nowrap; padding:1px 0 }
+/* the target reads as a third axis tick sitting exactly on the dashed line — in the
+   gutter, so unlike a label inside the plot it can never be hidden behind a bar */
+.cc-axis .tgt { position:absolute; inset-inline-end:0; transform:translateY(50%);
+        color:var(--ink); font-weight:600; background:var(--card); padding:0 2px }
+.cc-bars { height:68px; display:flex; gap:6px; align-items:flex-end; position:relative }
+.mb { flex:1; max-width:24px; margin:0 auto; border-radius:4px 4px 0 0; min-height:3px }
 .tline { position:absolute; left:0; right:0; border-top:2px dashed var(--ink);
-        opacity:.4; pointer-events:none }
-.tline small { position:absolute; top:-15px; right:0; font-size:.6rem; color:var(--soft);
-        background:var(--card); padding:0 3px }
-.cc-now { font-size:.74rem; color:var(--soft); margin-top:7px }
+        opacity:.45; pointer-events:none }
+.cc-months { display:flex; gap:6px; margin-top:6px }
+.cc-months span { flex:1; text-align:center; font-size:.62rem; color:var(--soft);
+        overflow:hidden; white-space:nowrap }
+.cc-months span.now { color:var(--ink); font-weight:700 }
+.cc-now { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+        font-size:.82rem; color:var(--soft); margin-top:10px }
+.cc-now b { color:var(--ink); font-weight:600 }
 
 /* ---- tables ---- */
 table { width:100%; border-collapse:collapse; font-size:.88rem }
@@ -221,6 +309,28 @@ th .arr { font-size:.6rem }
 td { padding:8px 4px; border-bottom:1px solid var(--line) }
 tr:last-child td { border-bottom:0 }
 .amt { font-weight:600; white-space:nowrap }
+.amt.in { color:var(--green) }
+/* money-direction filter: one row of segmented buttons above the table */
+.fseg { display:inline-flex; gap:6px; margin:0 0 10px }
+.fseg button { padding:7px 16px; border:1px solid var(--line); border-radius:20px;
+        background:var(--card); font:inherit; font-size:.85rem; cursor:pointer; color:var(--ink) }
+.fseg button:hover { background:var(--sel) }
+.fseg button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:700 }
+.catname { font-size:.82rem; color:var(--soft) }
+/* ---- data-source freshness ---- */
+.srcgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:10px }
+.srcbox { border:1px solid var(--line); border-radius:12px; padding:11px 13px }
+.srchead { display:flex; align-items:center; gap:7px; font-weight:600; font-size:.92rem }
+.srchead i { width:9px; height:9px; border-radius:50%; flex:none }
+.srcline { font-size:.74rem; color:var(--soft); margin-top:5px; line-height:1.6 }
+.srcline b { color:var(--ink); font-weight:600 }
+.srcage { font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:9px; margin-inline-start:auto }
+.srcage.ok   { background:#e7f6ee; color:#116646 }
+.srcage.warn { background:#fdf3e0; color:#8a5a00 }
+.srcage.old  { background:#fdebec; color:#a12b30 }
+/* issuer badge: colored dot carries identity, text stays in the normal ink color */
+.iss { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:.82rem }
+.iss i { width:9px; height:9px; border-radius:50%; flex:none }
 input { width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:12px;
         font:inherit; background:var(--card); margin-bottom:10px }
 .chip { display:none; margin:0 0 10px; padding:7px 14px; background:var(--sel); border:1px solid var(--accent);
@@ -240,7 +350,19 @@ select.recat { padding:5px 8px; border:1px solid var(--line); border-radius:9px;
 input.budget-edit { width:5.2em; padding:3px 6px; margin:0; border:1px solid var(--line);
         border-radius:8px; font:inherit; font-size:.82rem; text-align:center; background:var(--bg) }
 input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--card) }
-@media (max-width:760px) { .addrow { grid-template-columns:1fr 1fr } }
+.uprow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center }
+#catman .uprow { grid-template-columns:2fr 1fr auto }
+.ctag { display:inline-flex; align-items:center; gap:7px; background:var(--sel);
+        border:1px solid var(--accent); border-radius:20px; padding:5px 12px;
+        margin:0 0 6px 6px; font-size:.85rem }
+.ctag button { border:0; background:none; cursor:pointer; font-size:.9rem; opacity:.55; padding:0 }
+.ctag button:hover { opacity:1 }
+.uprow input[type=file] { padding:9px 12px; border:1px dashed var(--line); border-radius:12px;
+        font:inherit; font-size:.85rem; background:var(--bg); cursor:pointer }
+.uprow button { padding:10px 18px; border:0; border-radius:12px; background:var(--green);
+        color:#fff; font:inherit; font-weight:700; cursor:pointer }
+.uprow button:disabled { opacity:.5 }
+@media (max-width:760px) { .addrow { grid-template-columns:1fr 1fr } .uprow { grid-template-columns:1fr } }
 
 @media (max-width:760px) {
   body { padding:18px 14px 86px }
@@ -278,11 +400,16 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 <!-- ================= overview ================= -->
 <section class="view on" id="v-overview">
   <div class="cards">
-    <div class="card"><div class="lbl">הוצאות</div><div class="val" id="spent"></div></div>
-    <div class="card"><div class="lbl">תקציב</div><div class="val" id="budget"></div></div>
-    <div class="card"><div class="lbl" id="pacelbl"></div><div class="val" id="pace"></div></div>
+    <div class="card in"><div class="lbl">הכנסות</div><div class="val" id="income"></div>
+      <div class="sub2" id="income-sub"></div></div>
+    <div class="card"><div class="lbl">הוצאות</div><div class="val" id="spent"></div>
+      <div class="sub2"></div></div>
+    <div class="card"><div class="lbl">נשאר החודש</div><div class="val" id="saved"></div>
+      <div class="sub2" id="saved-sub"></div></div>
   </div>
   <div class="banner" id="banner"></div>
+  <h2>מקורות המידע</h2>
+  <div class="panel"><div id="srcgrid" class="srcgrid"></div></div>
 
   <div class="grid2">
     <div>
@@ -308,6 +435,20 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 <section class="view" id="v-cats">
   <h2 style="margin-top:0">תקציב מול ביצוע <span class="hint">(לחצו על קטגוריה לתנועות שלה · שינוי מספר התקציב נשמר אוטומטית)</span></h2>
   <div class="panel" id="cats"></div>
+
+  <h2>ניהול קטגוריות</h2>
+  <div class="panel addform" id="catman">
+    <div class="uprow">
+      <input id="nc-name" placeholder="שם הקטגוריה (למשל: חיות מחמד)" style="margin:0">
+      <input id="nc-id" placeholder="מזהה באנגלית (pets)" style="margin:0">
+      <button id="nc-go">הוספה</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      הקטגוריה תופיע מיד בכל הרשימות · אפשר למחוק רק קטגוריות שהוספתם
+    </div>
+    <div class="hint" id="nc-msg" style="margin-top:6px"></div>
+    <div id="nc-list" style="margin-top:10px"></div>
+  </div>
 </section>
 
 <!-- ================= transactions ================= -->
@@ -323,12 +464,32 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
     </div>
     <div class="hint" id="a-msg" style="margin-top:6px"></div>
   </div>
+  <div class="panel addform" id="upform" style="margin-bottom:14px">
+    <div style="font-weight:700; margin-bottom:10px">📄 טעינת קובץ עסקאות (ישראכרט · ONE ZERO)</div>
+    <div class="uprow">
+      <input id="u-file" type="file" accept=".xlsx,.xls" multiple style="margin:0">
+      <button id="u-go">טעינה</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      הורידו את פירוט העסקאות מאתר ישראכרט או מאפליקציית ONE ZERO (קובץ Excel) וטענו אותו כאן ·
+      הקובץ מזוהה אוטומטית · אפשר לבחור כמה קבצים יחד ·
+      טעינה חוזרת של אותו קובץ בטוחה ולא תיצור כפילויות ·
+      חיובי כרטיסי האשראי בחשבון הבנק לא נספרים פעמיים
+    </div>
+    <div class="hint" id="u-msg" style="margin-top:6px"></div>
+  </div>
   <span class="chip" id="chip"></span>
+  <div class="fseg" id="fseg">
+    <button data-f="all" class="on">הכל</button>
+    <button data-f="out">הוצאות</button>
+    <button data-f="in">הכנסות</button>
+  </div>
   <input id="s" placeholder="חיפוש בית עסק או קטגוריה… 🔍">
   <div class="panel">
     <table id="t"><thead><tr>
       <th class="sortable" data-k="0">תאריך <span class="arr"></span></th>
       <th class="sortable" data-k="2">בית עסק <span class="arr"></span></th>
+      <th class="sortable" data-k="8">כרטיס <span class="arr"></span></th>
       <th class="sortable" data-k="3">קטגוריה <span class="arr"></span></th>
       <th class="sortable" data-k="4">סכום <span class="arr"></span></th>
       <th class="sortable" data-k="5">מקור <span class="arr"></span></th>
@@ -357,14 +518,78 @@ input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--ca
 <script>
 const DATA = __DATA__;
 const PALETTE = ['#1a9e6c','#e0a63a','#5b8def','#e5484d','#8e6fd8','#d97b4f','#4fb3bf','#97a25e','#b8b3ab'];
+// which institution each charge came from. Colors are drawn from PALETTE above (not the
+// issuers' real brand colors) and the mark is a dot beside the name, never colored text —
+// so the label stays legible and the file stays self-contained (no external logo requests).
+const ISSUERS = {
+  max:      { label: 'מקס',      color: '#5b8def' },
+  isracard: { label: 'ישראכרט',  color: '#8e6fd8' },
+  visaCal:  { label: 'כאל',      color: '#e0a63a' },
+  amex:     { label: 'אמריקן',   color: '#4fb3bf' },
+  leumi:    { label: 'לאומי',    color: '#1a9e6c' },
+  hapoalim: { label: 'הפועלים',  color: '#e5484d' },
+  // both spellings: the scraper's company id is camelCase, the file importer's
+  // account_id is lowercase — they must land on the same badge
+  oneZero:  { label: 'ONE ZERO', color: '#d97b4f' },
+  onezero:  { label: 'ONE ZERO', color: '#d97b4f' },
+  manual:   { label: 'ידני',     color: '#b8b3ab' },
+};
+const issuerOf = k => ISSUERS[k] || { label: k || '—', color: '#b8b3ab' };
 const VIEWS = { overview:'סקירה', cats:'קטגוריות', txns:'תנועות', trends:'מגמות' };
 const ils = x => '₪' + Math.round(x).toLocaleString('he-IL');
 const $ = id => document.getElementById(id);
+// merchant names are free text from the bank (e.g. Hebrew "ד"ר" contains a literal
+// quote) — never interpolate them into an HTML attribute unescaped, or the quote
+// terminates the attribute early and corrupts every attribute after it on that tag.
+const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+// Round a chart's top value up to a clean axis number: "2,526" as a tick is noise.
+// The steps include 3 and 4 so 2,526 lands on 3,000 rather than 5,000 — a coarser
+// ladder would leave the tallest bar at half the chart height, which is exactly the
+// wasted headroom the per-card scaling was added to avoid.
+const niceCeil = v => {
+  if (v <= 0) return 1;
+  const mag = 10 ** Math.floor(Math.log10(v));
+  return [1, 1.5, 2, 3, 4, 5, 7.5, 10].find(s => v <= s * mag) * mag;
+};
 
 let view = 'overview';
 let mi = Math.max(DATA.months.findIndex(m => m.key === DATA.startKey), 0);
 let selCat = null;
+let flow = 'all';               // money direction shown: all | out (spend) | in (income)
 let sort = { k: 0, dir: -1 };   // default: date, newest first
+
+/* ---------- keep your place across the reload every edit triggers ---------- */
+// Saving a category rebuilds the page and reloads it; without this you'd be thrown
+// back to the overview on the default month after every single correction.
+const UI_KEY = 'kaspion.ui';
+function saveUi() {
+  try {
+    sessionStorage.setItem(UI_KEY, JSON.stringify({
+      view, month: DATA.months[mi] ? DATA.months[mi].key : null,
+      selCat, sort, flow, search: $('s') ? $('s').value : '',
+    }));
+  } catch (e) { /* private mode — never fail an edit over bookkeeping */ }
+}
+function restoreUi() {
+  let saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem(UI_KEY) || 'null'); } catch (e) { return; }
+  if (!saved) return;
+  if (VIEWS[saved.view]) view = saved.view;
+  // resolve the month by KEY, never by a stored index: importing a statement can add
+  // months and silently shift every index underneath us
+  const idx = DATA.months.findIndex(m => m.key === saved.month);
+  if (idx >= 0) mi = idx;
+  selCat = saved.selCat || null;
+  if (['all', 'in', 'out'].includes(saved.flow)) flow = saved.flow;
+  if (saved.sort && typeof saved.sort.k === 'number') sort = saved.sort;
+  if (saved.search && $('s')) $('s').value = saved.search;
+}
+function applyView() {
+  document.querySelectorAll('#side nav a')
+    .forEach(x => x.classList.toggle('on', x.dataset.v === view));
+  document.querySelectorAll('.view')
+    .forEach(s => s.classList.toggle('on', s.id === 'v-' + view));
+}
 
 /* ---------- editing (one version for everyone; talks to the local server) ---------- */
 const API = location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8765';
@@ -399,11 +624,66 @@ async function api(path, payload, msgId = 'a-msg', busy = 'שומר…') {
 $('syncbtn').onclick = () =>
   api('/api/sync', {}, 'syncmsg', 'מסנכרן… זה יכול לקחת כמה דקות עם בנק אמיתי');
 
+/* ---------- managing the category list ---------- */
+function renderCatManager() {
+  const custom = DATA.categories.filter(c => c.custom);
+  $('nc-list').innerHTML = custom.length
+    ? `<div class="hint" style="margin-bottom:6px">קטגוריות שהוספתם:</div>` + custom.map(c =>
+        `<span class="ctag">${c.name}
+           <button class="ncdel" data-id="${escAttr(c.id)}" data-name="${escAttr(c.name)}"
+                   title="מחיקת הקטגוריה">✕</button></span>`).join('')
+    : '<div class="hint">עדיין לא הוספתם קטגוריות משלכם</div>';
+  document.querySelectorAll('.ncdel').forEach(b => b.onclick = () => {
+    // deleting moves anything filed under it back to "אחר" — say so before doing it
+    if (!confirm(`למחוק את "${b.dataset.name}"? תנועות שסווגו אליה יחזרו ל"אחר".`)) return;
+    api('/api/delete-category', { category_id: b.dataset.id }, 'nc-msg', 'מוחק…');
+  });
+}
+$('nc-go').onclick = () => {
+  const name = $('nc-name').value.trim();
+  const id = $('nc-id').value.trim().toLowerCase();
+  if (!name || !id) { $('nc-msg').textContent = 'צריך שם ומזהה באנגלית'; return; }
+  api('/api/add-category', { category_id: id, name }, 'nc-msg', 'מוסיף…');
+};
+
+// Upload Isracard statements. Files go up one at a time so a bad file names itself
+// in the error instead of failing the whole batch anonymously.
+$('u-go').onclick = async () => {
+  const files = [...$('u-file').files];
+  if (!files.length) { $('u-msg').textContent = 'בחרו קובץ Excel שהורדתם מאתר ישראכרט'; return; }
+  document.querySelectorAll('button').forEach(b => b.disabled = true);
+  let added = 0, updated = 0;
+  try {
+    for (const [i, file] of files.entries()) {
+      $('u-msg').textContent = `טוען ${i + 1}/${files.length} — ${file.name}…`;
+      const b64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error(`לא ניתן לקרוא את ${file.name}`));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(API + '/api/upload', {
+        method: 'POST', body: JSON.stringify({ filename: file.name, data: b64 }),
+      });
+      const out = await res.json();
+      if (!out.ok) throw new Error(`${file.name}: ${out.error || 'failed'}`);
+      added += out.added || 0;
+      updated += out.updated || 0;
+    }
+    $('u-msg').textContent = `✔ ${added} תנועות חדשות · ${updated} עודכנו — מרענן…`;
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    $('u-msg').textContent = e.message.includes('fetch')
+      ? 'השרת לא פועל — הריצו במסוף: python3 -m kaspion.serve'
+      : 'שגיאה: ' + e.message;
+    document.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+};
+
 /* ---------- navigation ---------- */
 document.querySelectorAll('#side nav a').forEach(a => a.onclick = () => {
   view = a.dataset.v;
-  document.querySelectorAll('#side nav a').forEach(x => x.classList.toggle('on', x === a));
-  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + view));
+  applyView();
   render();
   window.scrollTo({ top: 0 });
 });
@@ -429,20 +709,64 @@ function render() {
   if (view === 'cats') renderCats(m);
   if (view === 'txns') { renderChip(); renderTxns(); }
   if (view === 'trends') renderTrends(m);
+  saveUi();
+}
+
+function renderSources() {
+  // staleness is measured against the newest TRANSACTION, not the load time: a sync
+  // that runs nightly but silently returns nothing would otherwise look healthy
+  $('srcgrid').innerHTML = (DATA.sources || []).map(s => {
+    const iss = issuerOf(s.src);
+    const age = s.staleDays <= 3 ? 'ok' : s.staleDays <= 14 ? 'warn' : 'old';
+    const ageTxt = s.staleDays <= 0 ? 'היום'
+                 : s.staleDays === 1 ? 'אתמול'
+                 : `לפני ${s.staleDays} ימים`;
+    return `<div class="srcbox">
+      <div class="srchead"><i style="background:${iss.color}"></i>${iss.label}
+        <span class="srcage ${age}">${ageTxt}</span></div>
+      <div class="srcline">
+        תנועה אחרונה: <b>${s.to}</b><br>
+        טווח הנתונים: ${s.from} – ${s.to}<br>
+        <b>${s.n.toLocaleString('he-IL')}</b> תנועות · ${s.account}<br>
+        נטען לאחרונה: ${s.loaded}
+      </div></div>`;
+  }).join('') || '<div class="hint">אין עדיין נתונים</div>';
 }
 
 function renderOverview(m) {
+  renderSources();
   $('spent').textContent = ils(m.spent);
-  $('budget').textContent = ils(m.budget);
-  const under = m.pace >= 0;
+  $('income').textContent = ils(m.income);
+  // what's left of what came in — the number a household actually plans around
+  const left = m.income - m.spent;
+  $('saved').textContent = (left < 0 ? '−' : '') + ils(Math.abs(left));
+  $('saved').className = 'val ' + (left >= 0 ? 'good' : 'bad');
+  // The budget/pace line is gone from here: the banner already says whether the month
+  // is in good shape, and the per-category budgets live on the קטגוריות page.
+  const underPace = m.pace >= 0;
   const kotzev = m.isCurrent ? 'לקצב' : 'לתקציב';
-  $('pacelbl').textContent = (under ? 'מתחת ' : 'מעל ') + kotzev;
-  $('pace').textContent = ils(Math.abs(m.pace));
-  $('pace').className = 'val ' + (under ? 'good' : 'bad');
-  $('banner').className = 'banner ' + (under ? 'good' : 'bad');
-  $('banner').textContent = under
-    ? `✅ מעולה! ${m.isCurrent ? 'אתם' : 'הייתם'} ${ils(m.pace)} מתחת ${kotzev}`
-    : `⚠️ שימו לב — ${m.isCurrent ? 'אתם' : 'הייתם'} ${ils(-m.pace)} מעל ${kotzev}`;
+  $('saved-sub').textContent = m.income
+    ? `${Math.round(left / m.income * 100)}% מההכנסה`
+    : 'אין הכנסות בחודש זה';
+  // a month with no income is almost always missing data, not a month without pay
+  $('income-sub').textContent = m.income ? 'נכנס החודש' : 'לא נטענו הכנסות';
+
+  // The banner answers the question the household actually asks: did we live within
+  // what came in this month? It falls back to the budget pace only when there is no
+  // income loaded, where an income comparison would be meaningless.
+  if (!m.income) {
+    $('banner').className = 'banner ' + (underPace ? 'good' : 'bad');
+    $('banner').textContent = underPace
+      ? `✅ מעולה! ${m.isCurrent ? 'אתם' : 'הייתם'} ${ils(m.pace)} מתחת ${kotzev}`
+      : `⚠️ שימו לב — ${m.isCurrent ? 'אתם' : 'הייתם'} ${ils(-m.pace)} מעל ${kotzev}`;
+  } else if (left >= 0) {
+    $('banner').className = 'banner good';
+    $('banner').textContent = `✅ מעולה! נכנס יותר ממה שיצא — ${
+      m.isCurrent ? 'נשארו לכם' : 'נשארו'} ${ils(left)} מתוך ${ils(m.income)}`;
+  } else {
+    $('banner').className = 'banner bad';
+    $('banner').textContent = `⚠️ שימו לב — הוצאתם ${ils(-left)} יותר ממה שנכנס החודש`;
+  }
 
   // donut: top 6 categories + "אחרים"
   const cats = [...m.cats].sort((a, b) => b.actual - a.actual);
@@ -470,7 +794,9 @@ function renderOverview(m) {
     || '<div class="hint">אין עדיין הוצאות החודש 🎉</div>';
   document.querySelectorAll('.leg').forEach(el => el.onclick = () => gotoCat(el.dataset.cat));
 
-  $('top5').tBodies[0].innerHTML = [...m.txns].sort((a, b) => b[4] - a[4]).slice(0, 5)
+  // biggest EXPENSES — m.txns now carries income too, and a salary would otherwise
+  // sit at the top of a list titled "the 5 biggest expenses"
+  $('top5').tBodies[0].innerHTML = [...m.txns].filter(t => !t[10]).sort((a, b) => b[4] - a[4]).slice(0, 5)
     .map(t => `<tr><td>${t[1]}</td><td>${t[2]}</td><td>${t[3]}</td><td class="amt">${ils(t[4])}</td></tr>`)
     .join('') || '<tr><td colspan="4" class="hint">אין תנועות</td></tr>';
 }
@@ -485,7 +811,9 @@ function renderCats(m) {
           <small>מתוך תקציב של</small>
           <input type="number" class="budget-edit" data-id="${c.id}" value="${c.budget || ''}"
                  min="0" step="50" placeholder="—" title="שינוי התקציב החודשי — נשמר אוטומטית">
-          <small>₪</small></span></div>
+          <small>₪</small>${c.suggested
+            ? `<span class="sugg-tag" title="חושב אוטומטית מהממוצע של 3 החודשים האחרונים — כל שינוי ידני יחליף אותו לצמיתות">מוצע</span>`
+            : ''}</span></div>
       <div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div></div>`;
   }).join('') || '<div class="hint">אין עדיין הוצאות החודש 🎉</div>';
   document.querySelectorAll('.cat').forEach(el => el.onclick = e => {
@@ -497,6 +825,7 @@ function renderCats(m) {
     const amount = parseFloat(inp.value);
     if (amount >= 0) api('/api/set-budget', { category: inp.dataset.id, amount });
   });
+  renderCatManager();
 }
 
 function gotoCat(name) {
@@ -513,21 +842,38 @@ function renderChip() {
 function renderTxns() {
   const m = DATA.months[mi];
   const v = $('s').value.trim();
+  // keep the segmented control in step with `flow`, including after a restore
+  document.querySelectorAll('#fseg button')
+    .forEach(b => b.classList.toggle('on', b.dataset.f === flow));
   const rows = m.txns
+    .filter(t => flow === 'all' || (flow === 'in' ? t[10] : !t[10]))
     .filter(t => !selCat || t[3] === selCat)
-    .filter(t => !v || t[2].includes(v) || t[3].includes(v))
+    // search matches merchant, category, and the card it came from ("מקס", "ישראכרט"…)
+    .filter(t => !v || t[2].includes(v) || t[3].includes(v) || issuerOf(t[8]).label.includes(v))
     .sort((a, b) => {
-      const x = a[sort.k], y = b[sort.k];
+      // the כרטיס column renders the Hebrew label, so it must sort by that and not by
+      // the internal key ('isracard', 'onezero'), which produces a baffling order
+      const val = t => sort.k === 8 ? issuerOf(t[8]).label : t[sort.k];
+      const x = val(a), y = val(b);
       return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'he')) * sort.dir;
     });
-  const catCell = t =>
-    `<td><select class="recat" data-m="${t[2]}">${DATA.categories.map(c =>
+  // Income keeps its category as plain text: the dropdown lists spend categories only
+  // (dim_category minus 'income'), so rendering one here would show the wrong option
+  // selected and let a salary be filed under "groceries".
+  const catCell = t => t[10]
+    ? `<td><span class="catname">${t[3]}</span></td>`
+    : `<td><select class="recat" data-m="${escAttr(t[2])}">${DATA.categories.map(c =>
       `<option value="${c.id}" ${c.id === t[7] ? 'selected' : ''}>${c.name}</option>`).join('')}</select></td>`;
+  const issCell = t => {
+    const s = issuerOf(t[8]);
+    return `<td><span class="iss" title="${escAttr(t[9] || s.label)}">
+      <i style="background:${s.color}"></i>${s.label}</span></td>`;
+  };
   $('t').tBodies[0].innerHTML = rows.map(t =>
-    `<tr><td>${t[1]}</td><td>${t[2]}</td>${catCell(t)}
-     <td class="amt">${ils(t[4])}</td><td>${t[5]}</td>
+    `<tr><td>${t[1]}</td><td>${t[2]}</td>${issCell(t)}${catCell(t)}
+     <td class="amt ${t[10] ? 'in' : ''}">${t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
      <td><button class="del" title="הסתרת התנועה" data-id="${t[6]}">🗑</button></td></tr>`).join('')
-    || '<tr><td colspan="6" class="hint">לא נמצאו תנועות</td></tr>';
+    || '<tr><td colspan="7" class="hint">לא נמצאו תנועות</td></tr>';
   document.querySelectorAll('#t .del').forEach(b => b.onclick = () => {
     if (confirm('להסתיר את התנועה מכל החישובים?')) api('/api/remove', { transaction_id: b.dataset.id });
   });
@@ -538,6 +884,9 @@ function renderTxns() {
     th.querySelector('.arr').textContent =
       +th.dataset.k === sort.k ? (sort.dir === 1 ? '▲' : '▼') : '';
   });
+  // search, sort and the category chip re-render only this table, never render(),
+  // so they need their own save or those choices are lost on the next edit
+  saveUi();
 }
 
 document.querySelectorAll('#t th.sortable').forEach(th => th.onclick = () => {
@@ -546,15 +895,33 @@ document.querySelectorAll('#t th.sortable').forEach(th => th.onclick = () => {
   renderTxns();
 });
 $('chip').onclick = () => { selCat = null; renderChip(); renderTxns(); };
+document.querySelectorAll('#fseg button').forEach(b => b.onclick = () => {
+  flow = b.dataset.f;
+  document.querySelectorAll('#fseg button').forEach(x => x.classList.toggle('on', x === b));
+  renderTxns();
+});
 $('s').addEventListener('input', renderTxns);
 
 function renderTrends(m) {
-  const maxT = Math.max(...DATA.months.map(x => x.spent), 1);
-  $('trend').innerHTML = DATA.months.map((x, i) =>
-    `<div class="tcol ${i === mi ? 'sel' : ''}" data-i="${i}">
+  // one shared scale for both series — income and spend are the same unit, so they
+  // must never get separate axes or the comparison between them is meaningless
+  const TH = 130;
+  const maxT = Math.max(...DATA.months.map(x => Math.max(x.spent, x.income)), 1);
+  $('trend').innerHTML = DATA.months.map((x, i) => {
+    const overspent = x.income > 0 && x.spent > x.income;
+    return `<div class="tcol ${i === mi ? 'sel' : ''}" data-i="${i}">
        <div class="tval">${ils(x.spent)}</div>
-       <div class="tbar" style="height:${Math.max(x.spent / maxT * 130, 4)}px"></div>
-       <div class="tlab">${x.label.split(' ')[0]}</div></div>`).join('');
+       <div class="tplot" style="height:${TH}px">
+         <div class="tbar" style="height:${Math.max(x.spent / maxT * TH, 4)}px"></div>
+         ${x.income ? `<div class="tinc ${overspent ? 'over' : ''}"
+              style="bottom:${x.income / maxT * TH}px"
+              title="הכנסות: ${ils(x.income)}"><span>${ils(x.income)}</span></div>` : ''}
+       </div>
+       <div class="tlab">${x.label.split(' ')[0]}</div>
+       ${x.income ? `<div class="tsave ${overspent ? 'bad' : 'good'}">${
+         overspent ? '−' : '+'}${ils(Math.abs(x.income - x.spent))}</div>` : ''}
+       </div>`;
+  }).join('');
   document.querySelectorAll('.tcol').forEach(el => el.onclick = () => { mi = +el.dataset.i; render(); });
 
   $('save').tBodies[0].innerHTML = [...DATA.months].reverse().map(x =>
@@ -571,34 +938,90 @@ function renderTrends(m) {
   const list = Object.values(cats).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
   $('catgrid').innerHTML = list.map(c => {
     const budget = [...c.series].reverse().find(s => s && s.budget)?.budget || 0;
-    // scale to whichever is taller — the biggest month or the target — so the
-    // dashed target line always fits inside the chart
-    const scale = Math.max(...c.series.map(s => s ? s.actual : 0), budget, 1);
+    // each card scales to ITS OWN spending, never stretched out by a budget the
+    // household is comfortably under — a housing budget of 8,500 next to real
+    // spend of ~1,000 would otherwise flatten every real bar to a sliver.
+    // Only fold the target into the scale when it's in the same ballpark as
+    // actual spend (≤40% above the highest month) — otherwise skip drawing the
+    // line (the exact target is still in the footer text) so the bars keep full
+    // resolution instead of leaving 80% of the chart empty above them.
+    const actualMax = Math.max(...c.series.map(s => s ? s.actual : 0), 1);
+    const showLine = budget > 0 && budget <= actualMax * 1.4;
+    const rawScale = showLine ? Math.max(actualMax, budget) : actualMax;
+    const scale = niceCeil(rawScale); // clean axis top (e.g. 3,000, not 2,526)
     const withBudget = c.series.filter(s => s && s.status !== 'no_budget').length;
     const under = c.series.filter(s => s && s.status === 'under').length;
+    const CH = 68; // chart height in px — must match .cc-chart { height }
     const bars = c.series.map((s, i) => {
       const v = s ? s.actual : 0;
       const col = !s || s.status === 'no_budget' ? 'var(--accent)'
                 : s.status === 'under' ? 'var(--green)' : 'var(--red)';
       return `<div class="mb" title="${DATA.months[i].label}: ${ils(v)}"
-                   style="height:${Math.max(v / scale * 52, 3)}px;background:${col}"></div>`;
+                   style="height:${Math.max(v / scale * CH, 3)}px;background:${col}"></div>`;
     }).join('');
-    const tline = budget
-      ? `<div class="tline" style="bottom:${budget / scale * 52}px" title="יעד חודשי: ${ils(budget)}">
-           <small>יעד ${ils(budget)}</small></div>`
+    // the target value rides in the footer text, never floating over the bars — a label
+    // positioned inside the chart collides with whichever bar happens to sit at that height
+    const tline = showLine
+      ? `<div class="tline" style="bottom:${budget / scale * CH}px" title="יעד חודשי: ${ils(budget)}"></div>`
       : '';
+    // each card's own scale, so a ₪150 category and a ₪3,000 one both use full
+    // chart height — reading the axis is how you tell them apart, not bar size.
+    // The target gets an axis tick only when its line is drawn AND it clears the
+    // 0 and max labels; a target near either end would print on top of them.
+    // Draw the tick whenever the line is drawn; whether it actually fits between the
+    // 0 and max labels is decided by measuring after layout (see below) rather than
+    // by a pixel threshold, which depends on font metrics we don't control here.
+    const tgtY = showLine ? budget / scale * CH : 0;
+    const axis = `<div class="cc-axis"><span>${ils(scale)}</span>${showLine
+        ? `<span class="tgt" style="bottom:${tgtY}px">${ils(budget)}</span>` : ''
+      }<span>${ils(0)}</span></div>`;
+    // 3-letter month names (מאי · יונ · יול · אוג · ספט) — the full ones overflow
+    // once a card is showing five or more months side by side
+    const months = `<div class="cc-months">${c.series.map((s, i) =>
+      `<span class="${DATA.months[i].isCurrent ? 'now' : ''}">${
+        DATA.months[i].label.split(' ')[0].slice(0, 3)}</span>`).join('')}</div>`;
     const ratio = under / Math.max(withBudget, 1);
     const badge = ratio === 1 ? 'ok' : ratio >= 0.5 ? 'mid' : 'bad';
+    // with the target on the axis the footer keeps only two facts, one per side, so
+    // it stays on a single line instead of wrapping raggedly
+    // "החודש" means the month the page is showing (mi) — NOT the last month in the
+    // data. Using .at(-1) made every card read ₪0 whenever the newest month happened
+    // to be empty, while its own bars clearly showed spending.
+    const latest = ils((c.series[mi] || { actual: 0 }).actual);
     return `<div class="catcard" data-cat="${c.name}">
       <div class="cc-head"><span>${c.name}</span>
         <span class="badge ${badge}">${under}/${withBudget} בתקציב</span></div>
-      <div class="cc-bars">${bars}${tline}</div>
-      <div class="cc-now">${ils((c.series.at(-1) || {actual:0}).actual)} החודש · סה"כ ${ils(c.total)}</div>
+      <div class="cc-chart">
+        <div class="cc-plot"><div class="cc-bars">${bars}${tline}</div>${months}</div>
+        ${axis}
+      </div>
+      <div class="cc-now"><span><b>${latest}</b> החודש${budget
+        ? `<span class="tgt-fb"${showLine ? ' hidden' : ''}> · יעד ${ils(budget)}</span>` : ''
+      }</span><span>סה"כ ${ils(c.total)}</span></div>
     </div>`;
   }).join('');
+  // A target sitting near 0 or near the top would print straight through the axis's
+  // own end labels. Rather than guess a pixel threshold, measure the rendered boxes:
+  // if they actually intersect, drop the tick and fall back to the footer's "יעד".
+  document.querySelectorAll('.catcard').forEach(card => {
+    const tick = card.querySelector('.cc-axis .tgt');
+    if (!tick) return;
+    const box = tick.getBoundingClientRect();
+    const hits = [...card.querySelectorAll('.cc-axis > span:not(.tgt)')].some(end => {
+      const r = end.getBoundingClientRect();
+      return box.bottom > r.top && box.top < r.bottom;
+    });
+    if (hits) {
+      tick.remove();
+      const fallback = card.querySelector('.tgt-fb');
+      if (fallback) fallback.hidden = false;
+    }
+  });
   document.querySelectorAll('.catcard').forEach(el => el.onclick = () => gotoCat(el.dataset.cat));
 }
 
+restoreUi();
+applyView();
 render();
 </script>
 </body></html>"""
