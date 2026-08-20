@@ -70,13 +70,16 @@ $env:PUPPETEER_CACHE_DIR = $puppeteerCache
 function Install-Scraper {
   Push-Location scraper
   try {
-    & (Join-Path $scripts "npm.cmd") install --no-audit --no-fund
+    # bare npm/npx, resolved through the PATH set above: nodejs-wheel installs these
+    # as console-script shims whose extension is pip/uv's business (.exe today), so
+    # hardcoding one is how this broke the first time.
+    & npm install --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { return $false }
     # Fetch the browser explicitly instead of relying on puppeteer's postinstall hook:
     # npm 12 blocks install scripts by default, which would leave a "successful" install
     # with no browser and every scrape failing later. Idempotent — a no-op once present,
     # and with no arguments it installs exactly what puppeteer itself asks for.
-    & (Join-Path $scripts "npx.cmd") puppeteer browsers install
+    & npx puppeteer browsers install
     return ($LASTEXITCODE -eq 0)
   } finally { Pop-Location }
 }
