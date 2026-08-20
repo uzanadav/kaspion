@@ -1,4 +1,4 @@
-# kaspion installer — Windows. Launched by install.bat (double-click that, not this).
+﻿# kaspion installer — Windows. Launched by install.bat (double-click that, not this).
 #
 # Everything lands inside the app folder (uv, Python, the libraries, the scraper), so
 # uninstalling is deleting that folder plus the data folder printed at the end. Nothing
@@ -6,14 +6,26 @@
 #
 # Safe to re-run: every step skips work already done, so an interrupted download just
 # means running it again.
+#
+# NOTE: this file must keep its UTF-8 BOM. Windows PowerShell 5.1 — what `powershell`
+# launches, and what most users have — reads a BOM-less .ps1 as ANSI, which mangles
+# every Hebrew string here and fails to parse the script at all.
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $env:PYTHONUTF8 = "1"
+# ...and the console has to be UTF-8 too, or the Hebrew parses correctly but prints
+# as mojibake in the window the user is reading.
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 
 function Say($m) { Write-Host "`n$m" -ForegroundColor White }
+# Keeps the window open for someone who double-clicked, but never blocks an automated
+# run (CI has no stdin, and a Read-Host there would hang the job until it times out).
+function Wait-ForUser {
+  if (-not $env:CI) { Read-Host "`nהקישו Enter לסגירה" | Out-Null }
+}
 function Die($m) {
   Write-Host "`n[X] $m" -ForegroundColor Red
-  Read-Host "`nהקישו Enter לסגירה" | Out-Null
+  Wait-ForUser
   exit 1
 }
 
@@ -89,4 +101,4 @@ if ($LASTEXITCODE -ne 0) { Die "יצירת בסיס הנתונים נכשלה" }
 
 Write-Host "`n[OK] ההתקנה הושלמה." -ForegroundColor Green
 Write-Host "להפעלה - לחצו פעמיים על kaspion.bat"
-Read-Host "`nהקישו Enter לסגירה" | Out-Null
+Wait-ForUser
