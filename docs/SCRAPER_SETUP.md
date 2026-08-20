@@ -37,7 +37,7 @@ Nothing downstream changes.
 ## Step 1 — Install the scraper library (one time)
 
 ```bash
-cd scraper && npm install && cd ..
+cd scraper && npm install && cd ..   # end users get this from `install`
 ```
 
 This downloads `israeli-bank-scrapers` + a headless Chromium (~300 MB, used to drive the bank sites).
@@ -69,7 +69,7 @@ Start with ONE institution, verify, then add the rest.
 ## Step 3 — First real run
 
 ```bash
-python3 sync.py --source scraper --skip-categorize
+python3 sync.py --skip-categorize
 ```
 
 Expect this to take 1–3 minutes per institution (it's driving a real browser).
@@ -109,18 +109,18 @@ con.execute("DELETE FROM state.ai_proposals")   # proposals learned from seed me
 con.close()
 print("seed data removed")
 EOF
-python3 sync.py --source scraper    # rebuild + categorize real merchants
+python3 sync.py    # rebuild + categorize real merchants
 ```
 
 ## Step 6 — Make it routine
 
 ```bash
 # manual: run whenever you want fresh numbers
-python3 sync.py --source scraper
+python3 sync.py
 
 # or automatic daily at 07:00 (macOS/Linux cron):
 crontab -e
-# 0 7 * * * cd ~/Desktop/kaspion && ./.venv/bin/python3 sync.py --source scraper >> data/sync.log 2>&1
+# 0 7 * * * cd ~/Desktop/kaspion && ./.venv/bin/python3 sync.py >> ~/kaspion-sync.log 2>&1
 ```
 
 ## Troubleshooting
@@ -129,7 +129,7 @@ crontab -e
 |---|---|
 | `INVALID_PASSWORD` | credentials typo — rerun `python3 -m kaspion.ingest.crypto` |
 | `CHANGE_PASSWORD` | the bank forces a password change — do it on their site first |
-| Login hangs / captcha | banks sometimes challenge automation; retry later, or watch it happen with `KASPION_SHOW_BROWSER=1 python3 sync.py --source scraper` |
+| Login hangs / captcha | banks sometimes challenge automation; retry later, or watch it happen with `KASPION_SHOW_BROWSER=1 python3 sync.py` |
 | `INVALID_PASSWORD` but the same credentials work in your browser | the library reports every non-success login code as `INVALID_PASSWORD`. Isracard/Amex in particular are known to block automated logins (bot detection / Cloudflare WAF). Run with `KASPION_SHOW_BROWSER=1` to see whether a block page or verification step is what's actually returned. |
 | 2FA / OTP prompt | some accounts require SMS codes; israeli-bank-scrapers has limited OTP support per bank — check its README for your institution |
 | Duplicate transactions | shouldn't happen (dedup by transaction id) — if it does, the institution changed its id format; check `_assign_ids` in `kaspion/ingest/scraper_loader.py` |

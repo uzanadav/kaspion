@@ -26,14 +26,26 @@ secondary. When a change trades simplicity for sophistication, choose simplicity
 
 ```bash
 cd ~/Desktop/kaspion
-bash scripts/setup.sh              # venv + deps + sample data + full pipeline
+bash scripts/setup.sh              # venv + deps + an EMPTY database
+bash scripts/setup.sh --demo       # ...or with the 341-row synthetic dataset
 source .venv/bin/activate
-python3 -m kaspion.serve           # http://127.0.0.1:8765  (edit mode)
-python3 sync.py --source scraper   # scrape all institutions, rebuild, categorize, regenerate
+python3 -m kaspion.serve           # http://127.0.0.1:8765 (edit mode); opens the browser
+python3 sync.py                    # scrape all institutions, rebuild, categorize, regenerate
 ```
 
-Python 3.11 in `.venv`. Node 26 for the scraper. Ollama (`llama3.2:3b`) is optional —
-`--provider none` works and built-in merchant rules still run.
+Python **3.10–3.13** (the `<3.14` pin in `pyproject.toml` is load-bearing: dbt dies on
+3.14 with a mashumaro `UnserializableField`, and it declares no upper bound of its own,
+so nothing else catches it). Node arrives as a Python dependency via `nodejs-wheel` —
+**do not tell anyone to install Node**. Categorization defaults to `none`: built-in
+merchant rules only, no model. Ollama/Claude are opt-in via `--provider`.
+
+`KASPION_DATA_DIR` relocates the database — it must be set **before** Python starts,
+because `db.py`/`crypto.py`/`report.py` resolve their paths into module constants at
+import time.
+
+**End users never see any of the above.** They double-click `install` once, then
+`kaspion` (see `INSTALL.md`); those scripts vendor uv into the app folder and bring
+their own Python, Node and Chromium.
 
 ## 3. Data flow
 
@@ -269,27 +281,74 @@ different question. Do not merge them.
   `SCRAPE_TIMEOUT = 240` so one hung login can't occupy the lock forever — do not remove
   it, and do not raise it casually.
 
+### 7b. Packaging traps — every one of these shipped broken before it was caught
+
+None of these are visible on the developer's Mac. All were found by actually running the
+installer end to end, and all are enforced by `.github/workflows/windows-check.yml`.
+
+- **`requires-python` must keep its `<3.14` upper bound.** dbt declares only `>=3.10` but
+  dies on 3.14 (`UnserializableField: Field "schema" ... is not serializable`, out of
+  mashumaro). `uv sync` installs the newest *allowed* Python, so without the ceiling every
+  fresh install is broken while a developer on 3.11 sees nothing wrong. Raise it only
+  after actually running dbt on the new version.
+- **The scraper's Chromium lives in `.puppeteer/` inside the app folder**, not the shared
+  `~/.cache/puppeteer`. `PUPPETEER_CACHE_DIR` is set by the installers **and** by
+  `scraper_loader.PUPPETEER_CACHE` at run time — **these two must stay equal**, or the
+  install downloads a browser the app then cannot find. The shared cache was abandoned
+  because a half-finished download there (from any project) makes installs fail
+  *permanently*: puppeteer sees the folder, finds no executable, and errors instead of
+  re-fetching, so re-running fails identically. The installers clear and retry once,
+  which is what makes "safe to re-run" true rather than aspirational.
+- **`scripts/install.ps1` must keep its UTF-8 BOM.** Windows PowerShell 5.1 — what
+  `powershell` launches, and what most users have — reads a BOM-less `.ps1` as ANSI. The
+  Hebrew turned to mojibake and the script failed to *parse* ("The string is missing the
+  terminator"). `setup.ps1` never hit this because it is English-only. The `.bat` files
+  `chcp 65001` for the same reason; do **not** give a `.bat` a BOM, cmd mis-executes it.
+- **Never hardcode `npm.cmd` / `npm.exe`.** `nodejs-wheel` ships npm/npx as console-script
+  shims whose extension is pip/uv's business. Put `.venv/Scripts` (or `bin`) on PATH and
+  call bare `npm`/`npx`.
+- **Fetch the browser explicitly** (`npx puppeteer browsers install`) rather than trusting
+  puppeteer's postinstall hook: npm 12 blocks install scripts by default, which would
+  otherwise yield a "successful" install with no browser and every scrape failing later.
+- **Anything that writes must go through `kaspion/paths.py`.** Writing into the source
+  tree breaks an installed copy and is what would let a distributed zip carry someone
+  else's data.
+
 ## 8. Layout
 
 ```
+install.command/.bat    what an end user double-clicks once: vendors uv into the app
+kaspion.command/.bat    folder, syncs Python+deps, npm-installs the scraper + Chromium,
+                        then `kaspion init`. The second pair just starts the server.
 kaspion/
-  report.py            ~230 lines — SQL → DATA dict, month flags, destinations, build_report()
-  assets/app.html       181 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
-  assets/app.css        362 — design tokens (light+dark), all component styles
-  assets/app.js         925 — the whole client: state, 4 views, 6 charts, edit calls
+  paths.py               45 — the per-user data dir (DB, key, credentials, dashboard).
+                        PURE: returns paths, never creates them; callers mkdir.
+  pipeline.py            44 — the ONLY place dbt is invoked; sets KASPION_DB_PATH +
+                        DBT_PROFILES_DIR. `python3 -m kaspion.pipeline build` to run it
+                        by hand. A bare `dbt` cannot work — see §10.
+  report.py             265 — SQL → DATA dict, month flags, destinations, build_report()
+  assets/app.html       235 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
+  assets/app.css        416 — design tokens (light+dark), all component styles
+  assets/app.js        1148 — the whole client: state, 4 views, 7 charts, edit calls,
+                        and renderEmptyState() for a brand-new install (§6)
   insights.py           285 — deterministic Hebrew observations (NO AI — see §9)
-  db.py                 123 — connect() + DDL + assign_natural_ids() (the shared
+  db.py                 124 — connect() + DDL + assign_natural_ids() (the shared
                         dedup/id-assignment every ingest path routes through)
-  serve.py              197 — local edit server; every /api/* rebuilds dbt + the report
-  cli.py                229 — terminal equivalents of the same operations
+  serve.py              339 — local edit server; every /api/* rebuilds dbt + the report
+  cli.py                250 — terminal equivalents, plus `init` (fresh empty install)
   ingest/               statements.py (dispatcher) · isracard_file · onezero_file
-                        scraper_loader (ScrapeError, add_institution) · crypto
-                        (COMPANY_FIELDS, FIELD_LABELS) · generate_seed
-  ai/                   known_merchants.py rules → providers (ollama/claude/none)
+                        scraper_loader (ScrapeError, add_institution, _node_bin,
+                        PUPPETEER_CACHE) · crypto (COMPANY_FIELDS, FIELD_LABELS)
+                        · generate_seed
+  ai/                   known_merchants.py rules → providers (none/ollama/claude)
 dbt/models/             staging → intermediate → marts
 tests/                  test_insights · test_report_charts · test_scraper_loader ·
-                        test_db · test_crypto · test_company_fields (skipped
-                        without node/scraper deps)
+                        test_db · test_crypto · test_paths · test_company_fields
+                        (skipped without scraper/node_modules)
+scripts/                setup.sh/.ps1 (developer) · install.ps1 (end user, MUST keep its
+                        UTF-8 BOM) · build-release.sh (zip + personal-data leak check)
+.github/workflows/      windows-check.yml — the dev machine is an arm64 Mac, so every
+                        Windows path/encoding claim is only ever proven here
 ```
 
 **The frontend lives in `kaspion/assets/`, not inside a Python string.** `build_report()`

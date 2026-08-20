@@ -7,7 +7,7 @@ Plain-language guide: what each step does, which tool does it, and why it exists
 
 ```
 get transactions → store them → clean & model them → categorize them → show them
-     (scraper)      (DuckDB)         (dbt)              (Ollama AI)   (dashboard.html)
+     (scraper)      (DuckDB)         (dbt)          (merchant rules)  (dashboard.html)
 ```
 
 One command runs the whole chain: `python3 sync.py`. Everything happens on this computer — nothing is uploaded anywhere.
@@ -19,7 +19,7 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 | | |
 |---|---|
 | **Tool** | `israeli-bank-scrapers` (free Node library) — or the seed generator while testing |
-| **Command** | `python3 sync.py --source scraper` (real) · `python3 kaspion/ingest/generate_seed.py` (fake) |
+| **Command** | `python3 sync.py` (real — the default) · `python3 sync.py --source seed` (synthetic) |
 | **What it does** | Logs into the bank/credit-card site with your encrypted credentials and downloads recent transactions. The fake generator creates realistic sample data so you can build/test without touching real accounts. |
 | **Why** | Automates what you'd do manually on the bank site every week. |
 
@@ -45,10 +45,10 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 
 | | |
 |---|---|
-| **Tool** | Ollama — a free AI that runs on your computer, no internet needed |
+| **Tool** | Built-in Israeli merchant rules. **No AI by default** — nothing to install, works on any machine. Ollama or Claude are opt-in via `--provider`. |
 | **Command** | (automatic, part of `sync.py`) |
-| **What it does** | Looks at each NEW merchant name ("רמי לוי", "NETFLIX.COM") and assigns a category (groceries, subscriptions…). It only ever asks about merchants it hasn't seen — known ones are answered from memory instantly. |
-| **Why** | Nobody wants to tag 200 transactions by hand every month. |
+| **What it does** | Looks at each NEW merchant name ("רמי לוי", "NETFLIX.COM") and assigns a category (groceries, subscriptions…). ~70 common Israeli merchants are known outright; anything else lands in "other" until you fix it once from the dashboard dropdown. It only ever asks about merchants it hasn't seen — known ones are answered from memory instantly. |
+| **Why** | Nobody wants to tag 200 transactions by hand every month — and nobody should need a 2GB model on a laptop to avoid it. |
 
 **Fixing a mistake** (this is the "merchant memory"):
 
@@ -75,7 +75,7 @@ start it. Terminal equivalents exist too: `kaspion.cli add / remove / recategori
 | | |
 |---|---|
 | **Tool** | `dashboard.html` — a single file the pipeline generates itself (`kaspion/report.py`) |
-| **Command** | (automatic, part of `sync.py`) — just open `dashboard.html` in any browser |
+| **Command** | (automatic, part of `sync.py`) — `python3 -m kaspion.serve` opens it for you |
 | **What it does** | One Hebrew, phone-friendly page: are we over/under budget (one glance), per-category budget bars, biggest expenses, month-by-month history. Fully interactive — arrows or the trend chart switch months, clicking a category filters the transactions, plus live search. |
 | **Why** | This is the part your wife uses. No server, no app, no login — double-click a file. Refresh the tab after every `sync.py`. |
 
@@ -84,10 +84,10 @@ start it. Terminal equivalents exist too: `kaspion.cli add / remove / recategori
 ## Daily / weekly routine
 
 ```bash
-python3 sync.py --source scraper    # pull new transactions + rebuild everything + regenerate dashboard.html
+python3 sync.py    # pull new transactions + rebuild everything + regenerate the dashboard
 ```
 
-Then refresh the `dashboard.html` tab in the browser. That's it. Fix any 🤖 miscategorizations you spot on the תנועות page with `recategorize`, and adjust budgets anytime:
+Then refresh the dashboard tab in the browser. That's it. Fix any 🤖 miscategorizations you spot on the תנועות page with `recategorize`, and adjust budgets anytime:
 
 ```bash
 python3 -m kaspion.cli set-budget groceries 3200
@@ -95,18 +95,24 @@ python3 -m kaspion.cli set-budget groceries 3200
 
 ## One-time setup checklist
 
+**Not a developer?** Ignore this list — double-click `install` once, then `kaspion`.
+See [INSTALL.md](../INSTALL.md).
+
 1. **Mac/Linux:** `bash scripts/setup.sh` · **Windows:** double-click `scripts\setup.bat` —
-   either one does everything: checks Python, creates the venv, installs dependencies,
-   generates sample data, and runs the full pipeline with step-by-step logs.
-   (Windows day-to-day: `scripts\serve.bat` opens the dashboard; use `python` instead of
-   `python3` in any command.)
-2. *(optional — later)* Install [Ollama](https://ollama.com), `ollama pull llama3.2:3b` (~2GB — we tested 1b and it failed on Hebrew merchants, don't bother), then `python3 sync.py` — AI categorization. Best quality: `llama3.1:8b` via `KASPION_OLLAMA_MODEL=llama3.1:8b`. Until then run `python3 sync.py --provider none`: everything works, transactions just sit in "other" until you categorize them by hand (`recategorize`) or turn AI on. If Ollama isn't running, `sync.py` won't fail — it finishes the pipeline and prints how to categorize.
-3. `python3 -m kaspion.ingest.crypto` — save bank credentials (encrypted)
-4. Connect the real banks (Max, Isracard, Leumi) — full walkthrough in `docs/SCRAPER_SETUP.md`
+   either one checks Python, creates the venv, installs dependencies and prepares an
+   **empty** database. Add `--demo` (or `-Demo` on Windows) to load the synthetic dataset
+   instead. (Windows day-to-day: `scripts\serve.bat`; use `python` instead of `python3`.)
+2. Connect a bank from the dashboard's **➕ הוספת חשבון**, or from the terminal with
+   `python3 -m kaspion.ingest.crypto` — full walkthrough in `docs/SCRAPER_SETUP.md`.
+3. `python3 sync.py` — pulls the real data. Categorization is rules-only by default.
+4. *(optional)* AI categorization for the merchants the rules miss: install
+   [Ollama](https://ollama.com), `ollama pull llama3.2:3b` (~2GB — 1b was tested and
+   failed on Hebrew merchants, don't bother), then `python3 sync.py --provider ollama`.
+   Best quality: `KASPION_OLLAMA_MODEL=llama3.1:8b`. If Ollama isn't running, `sync.py`
+   won't fail — it finishes the pipeline and prints how to categorize.
 
-The dashboard needs no setup at all — every `sync.py` run writes `dashboard.html`; open it in a browser.
-
-Remember: `source .venv/bin/activate` in every new terminal before running commands.
+The dashboard needs no setup — `python3 -m kaspion.serve` regenerates it and opens your
+browser. Remember: `source .venv/bin/activate` in every new terminal.
 
 ## Where things live
 
