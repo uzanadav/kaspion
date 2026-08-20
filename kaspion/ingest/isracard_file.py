@@ -20,8 +20,6 @@ import re
 from datetime import date, datetime
 from pathlib import Path
 
-from kaspion.db import connect
-
 # column layout under every "תאריך רכישה" header row (1-based, as in the sheet)
 COL_DATE, COL_MERCHANT, COL_CHARGED, COL_VOUCHER, COL_EXTRA = 1, 2, 5, 7, 8
 HEADER_CELL = "תאריך רכישה"
@@ -152,20 +150,3 @@ def parse_file(path: str | Path) -> list[dict]:
     return rows
 
 
-def import_file(path: str | Path) -> tuple[int, int]:
-    """Upsert one export into raw.transactions. Returns (added, updated).
-
-    Re-importing the same file is safe and self-correcting: a pending charge that
-    later settles for a different amount is refreshed rather than left stale.
-    """
-    from kaspion.ingest.statements import upsert_rows
-
-    return upsert_rows(parse_file(path))
-
-
-if __name__ == "__main__":
-    import sys
-
-    for arg in sys.argv[1:]:
-        added, updated = import_file(arg)
-        print(f"{Path(arg).name}: {added} new, {updated} updated")

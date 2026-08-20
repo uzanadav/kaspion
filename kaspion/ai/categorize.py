@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from kaspion.ai.known_merchants import match
 from kaspion.ai.providers import get_provider
 from kaspion.db import connect
@@ -54,7 +56,14 @@ def categorize_new_merchants() -> tuple[int, int]:
         provider = get_provider()
         for i in range(0, len(unknown), BATCH_SIZE):
             batch = unknown[i : i + BATCH_SIZE]
-            for merchant, category in provider.categorize(batch).items():
+            # one bad response (malformed JSON, model hiccup) must not lose every other
+            # batch — same isolation principle as one bank's scrape failure in sync.py
+            try:
+                results = provider.categorize(batch)
+            except json.JSONDecodeError:
+                print(f"      ⚠ AI batch skipped (unreadable response): {batch[0]}...")
+                continue
+            for merchant, category in results.items():
                 save(merchant, category, provider.name, provider.model)
                 by_ai += 1
     con.close()

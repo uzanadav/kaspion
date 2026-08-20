@@ -18,6 +18,9 @@ forever), and renders an interactive Hebrew dashboard: income vs. spending, budg
 monthly pacing, per-category trends, savings tracking, and inline editing (recategorize, add
 expenses, hide transactions, set budgets, add categories) — all from the browser.
 
+Multiple people's accounts merge into one household view, and any chart or table can be
+filtered down to a single card.
+
 ```
 bank / credit card ─┬─ scraper (Node)      ─┐
                     └─ statement upload     ├─▶ raw.transactions ─▶ dbt (staging → transfer &
@@ -31,9 +34,14 @@ bank / credit card ─┬─ scraper (Node)      ─┐
 
 ### How each account gets in
 
+Any institution [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers)
+supports works out of the box — add it from the dashboard's **➕ הוספת חשבון** button (or
+the terminal: `python3 -m kaspion.ingest.crypto`). The setup currently running in
+production, as an example of the two paths:
+
 | Institution | Method | Why |
 |---|---|---|
-| **Max** | scraper, fully automatic (cron-able) | works |
+| **Max** · **הבינלאומי** · **Visa CAL** | scraper, fully automatic (cron-able) | works |
 | **Isracard** | upload the monthly `.xlsx` from their site | their login is behind reCAPTCHA — see `docs/AGENT_HANDOFF.md` |
 | **ONE ZERO** | upload the `.xls` export from the app | needs one-time 2FA enrollment, not built yet |
 
@@ -41,14 +49,27 @@ Uploading is on the **תנועות** page: pick one or more files and press טע
 is detected from its contents, re-uploading the same file never creates duplicates, and card
 debits inside a bank statement are automatically excluded from spending.
 
+Note that a bank scraper reads the **checking account only**. If that bank's card is issued
+by someone else (הבינלאומי's cards come from CAL), add the card issuer as its own source to
+get itemized charges — otherwise the card appears as a single monthly lump debit.
+
 ## Privacy: what's in this repo vs. what stays on your machine
 
-| Committed (safe, synthetic) | Local only (gitignored) |
+Your data never lives in this folder at all — it goes in the OS's per-user data
+directory (`kaspion/paths.py`), so nothing personal can ride along in a copy or a zip
+of the repo:
+
+| macOS | `~/Library/Application Support/kaspion/` |
 |---|---|
-| All code, dbt models & tests | `data/finance.duckdb` — ALL your financial data |
-| `dbt/seeds/sample_transactions.csv` — **generated fake data** | `data/.kaspion_key` + `credentials.json.enc` — encrypted bank logins |
+| **Windows** | `%LOCALAPPDATA%\kaspion\` |
+| **Linux** | `~/.local/share/kaspion/` |
+
+| Committed (safe, synthetic) | Your machine only, outside the repo |
+|---|---|
+| All code, dbt models & tests | `finance.duckdb` — ALL your financial data |
+| `dbt/seeds/sample_transactions.csv` — **generated fake data** | `.kaspion_key` + `credentials.json.enc` — encrypted bank logins |
 | `evals/ground_truth.csv` — labels for the fake data | `dashboard.html` — generated, contains your real transactions |
-| Docs, category list, merchant rules | `.venv/`, dbt artifacts, logs |
+| Docs, category list, merchant rules | (`.venv/`, dbt artifacts and logs stay gitignored in the repo) |
 
 The only network calls the tool can ever make: your bank (scraping, TLS) and — only if you
 explicitly choose the paid provider — the Anthropic API (merchant *names* only, never
@@ -80,9 +101,15 @@ click things, nothing is real.
    `ollama pull llama3.2:3b` (~2GB disk, ~4GB RAM while running). **Skip this entirely on a
    weak machine** — run with `--provider none`: built-in Israeli merchant rules categorize
    the common stuff for free, and the rest is a one-time dropdown fix in the dashboard.
-2. **Bank credentials (encrypted at rest):** `python3 -m kaspion.ingest.crypto` — prompts
-   per institution (Leumi: username+password · Max: username+password · Isracard: ת"ז +
-   6 ספרות + password). Full walkthrough incl. verification steps: `docs/SCRAPER_SETUP.md`.
+2. **Connect a bank or card:** run `python3 -m kaspion.serve` and press
+   **➕ הוספת חשבון** in the sidebar — pick the institution, fill in the fields it asks
+   for, press the button. The login is verified before anything is saved, then 90 days
+   of history is pulled and the page reloads with real data. Isracard/Amex (reCAPTCHA)
+   and ONE ZERO (needs 2FA enrollment) show up greyed out with a 🔒 rather than as a
+   working login — upload their statement from the **תנועות** page instead. Terminal
+   equivalent: `python3 -m
+   kaspion.ingest.crypto`. Full walkthrough incl. verification steps:
+   `docs/SCRAPER_SETUP.md`.
 3. **Scraper (one time):** `cd scraper && npm install && cd ..`
 4. **Wipe the fake data, pull the real thing:**
    ```bash
@@ -107,6 +134,9 @@ each fix is permanent.
 - **Rules → AI → memory categorization** — ~70 known Israeli merchants are categorized
   deterministically for free; the AI only sees the tail; your corrections override
   everything and are never re-asked.
+- **Insights are computed, never generated** — the Hebrew observations on the overview page
+  come from plain SQL and Python, not a model. A local LLM was evaluated for the job and
+  produced confident, wrong numbers; a finance dashboard can't ship that.
 - **The UI is a generated static file** — no frontend framework, no build step, no server
   required to *view* it. A tiny stdlib server (`kaspion.serve`) adds editing.
 
@@ -115,17 +145,33 @@ each fix is permanent.
 | Path | What |
 |---|---|
 | `sync.py` | the one entrypoint: ingest → dbt → categorize → dashboard |
+| `kaspion/report.py` | SQL → data, then renders `dashboard.html` from the assets below |
+| `kaspion/assets/` | the actual frontend: `app.html` + `app.css` + `app.js`, inlined at build time into one self-contained file |
+| `kaspion/insights.py` | deterministic Hebrew observations (pure functions, no DB, no AI) |
 | `kaspion/ingest/` | seed generator, scraper wrapper, statement importers, credential encryption |
 | `kaspion/ingest/statements.py` | upload dispatcher — detects the bank from the file itself |
 | `kaspion/ai/` | rules layer + providers: ollama (default) / claude / none |
-| `kaspion/report.py` | generates `dashboard.html` |
 | `kaspion/serve.py` | local edit server (add/hide/recategorize/budgets/categories/upload/sync) |
 | `kaspion/cli.py` | terminal equivalents |
 | `dbt/` | staging → intermediate → marts, all tests |
+| `tests/` | pytest — insights, chart inputs, transaction-id assignment |
 | `evals/` | hand-labeled ground truth for categorization accuracy |
 | `scraper/` | Node wrapper around israeli-bank-scrapers |
 | `docs/AGENT_HANDOFF.md` | **read first if you're an AI agent** — state, invariants, known traps |
 | `docs/` | how it works, scraper setup, full spec & build plan |
+
+### Working on it
+
+```bash
+python3 -m pytest tests/ -q                 # 44 tests
+python3 -m ruff check .                     # config pinned in pyproject.toml
+python3 -m kaspion.pipeline build -q        # 20/20 — every build runs the data tests
+python3 -c "from kaspion.report import build_report; build_report()"
+node --check kaspion/assets/app.js          # the frontend is a real file, not a string
+```
+
+Edit `kaspion/assets/app.js` and `app.css` directly — they're ordinary files with syntax
+highlighting and tooling, inlined into `dashboard.html` only at build time.
 
 ## Before pushing your fork (privacy self-check)
 

@@ -1,0 +1,235 @@
+<!doctype html>
+<html dir="rtl" lang="he"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>הכסף שלנו</title>
+<style>
+__CSS__
+</style></head><body>
+<div class="toast" id="toast"></div>
+
+<div class="brand-mark" title="כספיון">
+  <svg viewBox="0 0 100 60" width="120" height="72" role="img" aria-label="כספיון">
+    <defs>
+      <linearGradient id="fishSilver" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f6f7f9"/>
+        <stop offset=".55" stop-color="#c7cad3"/>
+        <stop offset="1" stop-color="#8b8f9c"/>
+      </linearGradient>
+    </defs>
+    <path fill="url(#fishSilver)" stroke="rgba(30,30,40,.25)" stroke-width="1" stroke-linejoin="round"
+          d="M20 30 L0 10 L10 30 L0 50 Z"/>
+    <ellipse cx="56" cy="30" rx="30" ry="17" fill="url(#fishSilver)" stroke="rgba(30,30,40,.25)" stroke-width="1"/>
+    <path fill="url(#fishSilver)" stroke="rgba(30,30,40,.25)" stroke-width="1" stroke-linejoin="round"
+          d="M44 15 L50 1 L58 15 Z"/>
+    <circle cx="77" cy="24" r="3" fill="#1e2a52"/>
+  </svg>
+</div>
+
+<aside id="side">
+  <div class="logo">💰 הכסף שלנו</div>
+  <div class="tag">פרטי לחלוטין · על המחשב שלנו</div>
+  <nav>
+    <a data-v="overview" class="on"><span class="ico">🏠</span><span>סקירה</span></a>
+    <a data-v="cats"><span class="ico">📊</span><span>קטגוריות</span></a>
+    <a data-v="txns"><span class="ico">📋</span><span>תנועות</span></a>
+    <a data-v="trends"><span class="ico">📈</span><span>מגמות</span></a>
+  </nav>
+  <button id="syncbtn" title="מושך תנועות חדשות, בונה מחדש את הנתונים ומרענן את הדף">🔄 סנכרון עכשיו</button>
+  <button id="addacct" title="חיבור חשבון בנק או כרטיס אשראי חדש">➕ הוספת חשבון</button>
+  <button id="themebtn" title="מצב תצוגה">🌙 מצב כהה</button>
+  <div class="foot">עודכן <span class="num">__GENERATED__</span><br>kaspion · נוצר מ־sync.py</div>
+</aside>
+
+<div class="head">
+  <h1 id="vtitle">סקירה — <span id="mtitle"></span></h1>
+</div>
+<div class="sub" id="subline"></div>
+<div class="months" id="months"></div>
+
+<main>
+<!-- First run: no transactions yet. Static markup, never innerHTML-replaced, so the
+     real views below stay intact underneath it — see renderEmptyState() in app.js. -->
+<div class="panel" id="empty" hidden>
+  <h2 style="margin-top:0">עדיין אין נתונים</h2>
+  <div class="hint">כדי להתחיל, חברו חשבון בנק או כרטיס אשראי בעזרת
+  <b>➕ הוספת חשבון</b> בתפריט הצדדי, או טענו קובץ עסקאות מהמסך <b>תנועות</b>.</div>
+</div>
+
+<!-- ================= overview ================= -->
+<section class="view on" id="v-overview">
+  <div class="cards">
+    <div class="card in"><div class="lbl">הכנסות</div><div class="val" id="income"></div>
+      <div class="sub2" id="income-sub"></div></div>
+    <div class="card"><div class="lbl">הוצאות</div><div class="val" id="spent"></div>
+      <div class="sub2"></div></div>
+    <div class="card"><div class="lbl">נשאר החודש</div><div class="val" id="saved"></div>
+      <div class="sub2" id="saved-sub"></div></div>
+  </div>
+  <div class="banner" id="banner"></div>
+  <h2>תובנות</h2>
+  <div class="insights" id="insights"></div>
+
+  <div class="grid2">
+    <div>
+      <h2>חלוקת ההוצאות</h2>
+      <div class="panel split">
+        <div class="donut-wrap">
+          <svg width="210" height="210" viewBox="0 0 210 210" id="donut"></svg>
+          <div class="donut-c"><div class="b" id="donut-total"></div><div class="s">סה"כ החודש</div></div>
+        </div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+    <div>
+      <h2>5 ההוצאות הגדולות</h2>
+      <div class="panel"><table id="top5">
+        <thead><tr><th>תאריך</th><th>בית עסק</th><th>קטגוריה</th><th>סכום</th></tr></thead><tbody></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <h2>מקורות המידע</h2>
+  <div class="panel"><div id="srcgrid" class="srcgrid"></div></div>
+</section>
+
+<!-- ================= categories ================= -->
+<section class="view" id="v-cats">
+  <h2 style="margin-top:0">תקציב מול ביצוע <span class="hint">(לחצו על קטגוריה לתנועות שלה · שינוי מספר התקציב נשמר אוטומטית)</span></h2>
+  <div class="panel" id="cats"></div>
+
+  <h2>ניהול קטגוריות</h2>
+  <div class="panel addform" id="catman">
+    <div class="uprow">
+      <input id="nc-name" placeholder="שם הקטגוריה (למשל: חיות מחמד)" style="margin:0">
+      <input id="nc-id" placeholder="מזהה באנגלית (pets)" style="margin:0">
+      <button id="nc-go">הוספה</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      הקטגוריה תופיע מיד בכל הרשימות · אפשר למחוק רק קטגוריות שהוספתם
+    </div>
+    <div class="hint" id="nc-msg" style="margin-top:6px"></div>
+    <div id="nc-list" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- ================= transactions ================= -->
+<section class="view" id="v-txns">
+  <details class="toolbar">
+    <summary>➕ הוספת הוצאה · טעינת קובץ</summary>
+    <div class="panel addform" id="addform" style="margin-bottom:14px">
+      <div style="font-weight:700; margin-bottom:10px">➕ הוספת הוצאה ידנית</div>
+      <div class="addrow">
+        <input id="a-desc" placeholder="תיאור (למשל: פלאפל בשוק)" style="margin:0">
+        <input id="a-amt" type="number" min="0" step="0.01" placeholder="סכום ₪" style="margin:0">
+        <input id="a-date" type="date" style="margin:0">
+        <select id="a-cat"></select>
+        <button id="a-go">הוספה</button>
+      </div>
+      <div class="hint" id="a-msg" style="margin-top:6px"></div>
+    </div>
+    <div class="panel addform" id="upform" style="margin-bottom:14px">
+      <div style="font-weight:700; margin-bottom:10px">📄 טעינת קובץ עסקאות (ישראכרט · ONE ZERO)</div>
+      <div class="uprow">
+        <input id="u-file" type="file" accept=".xlsx,.xls" multiple style="margin:0">
+        <button id="u-go">טעינה</button>
+      </div>
+      <div class="hint" style="margin-top:6px">
+        הורידו את פירוט העסקאות מאתר ישראכרט או מאפליקציית ONE ZERO (קובץ Excel) וטענו אותו כאן ·
+        הקובץ מזוהה אוטומטית · אפשר לבחור כמה קבצים יחד ·
+        טעינה חוזרת של אותו קובץ בטוחה ולא תיצור כפילויות ·
+        חיובי כרטיסי האשראי בחשבון הבנק לא נספרים פעמיים
+      </div>
+      <div class="hint" id="u-msg" style="margin-top:6px"></div>
+    </div>
+  </details>
+  <span class="chip" id="chip"></span>
+  <div class="fseg" id="fseg">
+    <button data-f="all" class="on">הכל</button>
+    <button data-f="out">הוצאות</button>
+    <button data-f="in">הכנסות</button>
+  </div>
+  <div class="fseg wrap" id="accseg"></div>
+  <input id="s" placeholder="חיפוש בית עסק או קטגוריה… 🔍">
+  <div class="panel">
+    <table id="t"><thead><tr>
+      <th class="sortable" data-k="0">תאריך <span class="arr"></span></th>
+      <th class="sortable" data-k="2">בית עסק <span class="arr"></span></th>
+      <th class="sortable" data-k="8">כרטיס <span class="arr"></span></th>
+      <th class="sortable" data-k="3">קטגוריה <span class="arr"></span></th>
+      <th class="sortable" data-k="4">סכום <span class="arr"></span></th>
+      <th class="sortable" data-k="5">מקור <span class="arr"></span></th>
+      <th></th>
+    </tr></thead><tbody></tbody></table>
+    <div class="hint" style="margin-top:8px">🤖 סווג אוטומטית · ✅ תוקן ידנית · ❔ עדיין לא סווג —
+    שינוי קטגוריה נשמר לתמיד ותקף לכל התנועות של אותו בית עסק · 🗑 מסתיר תנועה מכל החישובים</div>
+  </div>
+</section>
+
+<!-- ================= trends ================= -->
+<section class="view" id="v-trends">
+  <h2 style="margin-top:0">הוצאות לאורך זמן <span class="hint">(לחצו על חודש למעבר)</span></h2>
+  <div class="panel">
+    <div class="tlegend">
+      <span class="tkey"><i class="ln inc"></i>הכנסות</span>
+      <span class="tkey"><i class="ln sp"></i>הוצאות</span>
+      <span class="tkey"><i class="dsh"></i>חודש חלקי — טרם הסתיים</span>
+      <span class="tkey">רקע ירוק = נשאר כסף · רקע אדום = חריגה</span>
+    </div>
+    <div id="trend"></div>
+  </div>
+
+  <h2>סה"כ הכנסות מול הוצאות <span class="hint">(בחרו אילו חודשים להכליל בסכום)</span></h2>
+  <div class="panel">
+    <div class="fseg wrap" id="sumseg"></div>
+    <div class="cards" style="margin-top:12px">
+      <div class="card in"><div class="lbl">סה"כ הכנסות</div><div class="val" id="sum-income"></div></div>
+      <div class="card"><div class="lbl">סה"כ הוצאות</div><div class="val" id="sum-spent"></div></div>
+      <div class="card"><div class="lbl">יתרה</div><div class="val" id="sum-net"></div></div>
+    </div>
+    <div class="hint" id="sum-note" style="margin-top:8px"></div>
+  </div>
+
+  <h2>מגמה לפי קטגוריה <span class="hint">ירוק = בתקציב · אדום = חריגה · (לחצו לתנועות)</span></h2>
+  <div class="catgrid" id="catgrid"></div>
+
+  <h2>קצב ההוצאה בתוך החודש <span class="hint">(החודש הנוכחי מול חודשים שהסתיימו · הקו נעצר בהיום)</span></h2>
+  <div class="panel">
+    <div class="tlegend" id="placegend"></div>
+    <div id="pace"></div>
+  </div>
+
+  <h2>הוצאות לפי כרטיס <span class="hint">(לחצו על מקטע לתנועות של אותו כרטיס)</span></h2>
+  <div class="panel">
+    <div class="tlegend" id="clegend"></div>
+    <div class="stack" id="cards"></div>
+  </div>
+
+  <h2>לאן הלך הכסף <span class="hint">(סה"כ מכל החודשים · לחצו לתנועות)</span></h2>
+  <div class="panel"><div class="dests" id="dests"></div></div>
+
+  <h2>שיעור החיסכון <span class="hint">(אחוז מההכנסה שנשאר · חודשים חלקיים לא נספרים)</span></h2>
+  <div class="panel"><div class="rate" id="rate"></div></div>
+</section>
+</main>
+
+<dialog id="acctdlg">
+  <form method="dialog"><button class="x" value="cancel" title="סגירה">✕</button></form>
+  <h3>חיבור חשבון חדש</h3>
+  <div class="hint">הפרטים מוצפנים ונשמרים על המחשב הזה בלבד — לא נשלחים לשום מקום חוץ מהבנק עצמו.</div>
+  <select id="acct-select" aria-label="בחירת בנק או כרטיס אשראי"></select>
+  <div id="acct-form"></div>
+  <div id="acct-connected"></div>
+  <div class="hint" id="acct-msg"></div>
+</dialog>
+
+<dialog id="syncdlg">
+  <form method="dialog"><button class="x" value="cancel" title="סגירה">✕</button></form>
+  <div class="sync-icon" id="sync-icon"></div>
+  <h3>סנכרון</h3>
+  <div id="sync-log"></div>
+</dialog>
+
+<script>
+__JS__
+</script>
+</body></html>

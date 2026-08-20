@@ -1,6 +1,9 @@
 # kaspion one-time setup — Windows.
 # Run:  double-click scripts\setup.bat   (or)   powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
-# Safe to re-run anytime. No AI model needed — the low-resource path is the default here.
+# Safe to re-run anytime — leaves an EMPTY database. Add -Demo to load 341 rows of
+# synthetic sample data instead: powershell ... -File scripts\setup.ps1 -Demo
+# No AI model needed — the low-resource path is the default here.
+param([switch]$Demo)
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $env:PYTHONUTF8 = "1"
@@ -35,10 +38,16 @@ Step "installing dependencies (duckdb, dbt-duckdb, pandas...)"
 & $venvPy -m pip install --quiet -e .
 Ok "installed"
 
-Step "generating sample data + running the full pipeline"
-& $venvPy kaspion/ingest/generate_seed.py
-& $venvPy sync.py --provider none
-Ok "pipeline green - dashboard.html created"
+if ($Demo) {
+  Step "generating sample data + running the full pipeline (-Demo)"
+  & $venvPy kaspion/ingest/generate_seed.py
+  & $venvPy sync.py --source seed --provider none
+  Ok "pipeline green with sample data loaded"
+} else {
+  Step "preparing an empty database (dbt build + all tests -> dashboard)"
+  & $venvPy -m kaspion.cli init
+  Ok "pipeline green - database is empty, ready for a real account"
+}
 
 Write-Host ""
 Write-Host "setup complete." -ForegroundColor Green

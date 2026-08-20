@@ -67,16 +67,17 @@ def test_partial_month_only_reports_an_overshoot():
     """Spend only grows: 'already more' is safe, 'less than' is not yet knowable."""
     base = [_month("2026-06", spent=1000, income=5000),
             _month("2026-07", spent=1000, income=5000)]
-    under = build_insights(base + [_month(CUR, spent=200)], CUR, limit=9)
+    under = build_insights([*base, _month(CUR, spent=200)], CUR, limit=9)
     assert not [i for i in under if i["kind"] == "mom_totals" and "כבר" in i["text"]]
-    over = build_insights(base + [_month(CUR, spent=5000)], CUR, limit=9)
+    over = build_insights([*base, _month(CUR, spent=5000)], CUR, limit=9)
     assert [i for i in over if i["kind"] == "mom_totals" and "כבר" in i["text"]]
 
 
 def test_noise_floor_suppresses_trivial_moves():
     """A ₪5 -> ₪20 category must not shout '+300%'."""
-    cats = lambda v: [{"id": "c", "name": "זוטות", "actual": v,
-                       "budget": 0, "status": "no_budget", "suggested": False}]
+    def cats(v):
+        return [{"id": "c", "name": "זוטות", "actual": v,
+                 "budget": 0, "status": "no_budget", "suggested": False}]
     months = [_month("2026-05", cats=cats(5)), _month("2026-06", cats=cats(5)),
               _month("2026-07", cats=cats(20)), _month(CUR)]
     assert "category_move" not in _kinds(build_insights(months, CUR, limit=9))
@@ -150,22 +151,23 @@ def test_recurring_link_lists_exactly_the_merchants_it_counted():
     def m(key, n):
         return _month(key, txns=[_txn(amount=100, merchant=f"sub{i}") for i in range(n)])
     months = [m("2026-06", 4), m("2026-07", 4), _month(CUR)]
-    rec = [i for i in build_insights(months, CUR, limit=9) if i["kind"] == "recurring"][0]
+    rec = next(i for i in build_insights(months, CUR, limit=9) if i["kind"] == "recurring")
     assert rec["text"].startswith("4 ")
     assert set(rec["link"]["merchants"]) == {f"sub{i}" for i in range(4)}
 
 
 def test_category_move_link_points_at_what_it_describes():
-    cats = lambda v: [{"id": "c", "name": "דיור", "actual": v,
-                       "budget": 0, "status": "no_budget", "suggested": False}]
+    def cats(v):
+        return [{"id": "c", "name": "דיור", "actual": v,
+                 "budget": 0, "status": "no_budget", "suggested": False}]
     months = [_month("2026-05", cats=cats(200)), _month("2026-06", cats=cats(200)),
               _month("2026-07", cats=cats(2000)), _month(CUR)]
-    mv = [i for i in build_insights(months, CUR, limit=9) if i["kind"] == "category_move"][0]
+    mv = next(i for i in build_insights(months, CUR, limit=9) if i["kind"] == "category_move")
     assert mv["link"] == {"view": "txns", "month": "2026-07", "cat": "דיור"}
 
 
 def test_uncategorized_link_filters_to_unclassified_rows():
     cur = _month(CUR, txns=[_txn(emoji="❔") for _ in range(6)])
-    unc = [i for i in build_insights([_month("2026-07"), cur], CUR, limit=9)
-           if i["kind"] == "uncategorized"][0]
+    unc = next(i for i in build_insights([_month("2026-07"), cur], CUR, limit=9)
+               if i["kind"] == "uncategorized")
     assert unc["link"]["uncat"] is True and unc["link"]["month"] == CUR

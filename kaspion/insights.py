@@ -31,6 +31,22 @@ def _is_real_merchant(key: str) -> bool:
     return bool(key) and not _REFERENCE_NOISE.search(key)
 
 
+def merchant_label(key: str) -> str:
+    """Display name for a merchant_key — the payee, not the payment.
+
+    Reference-numbered rows fragment into one 'merchant' per reference: four checks of the
+    same series read as four unrelated payees, three charges of one subscription as three
+    vendors. _is_real_merchant already knows which keys carry a reference; dropping the
+    reference from those collapses each family back into the single payee it really is.
+    Real merchant keys are returned untouched — this must never rewrite a genuine name.
+    """
+    if not key:
+        return "ללא שם"
+    if _is_real_merchant(key):
+        return key
+    return re.sub(r"[\s/\-]+", " ", re.sub(r"\d[\d/\-]*", "", key)).strip() or key
+
+
 # A month needs this many transactions before it may be compared against: the first month
 # of a fresh install starts mid-month with one source connected, and averaging against it
 # manufactures a "record" out of an artifact.

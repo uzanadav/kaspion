@@ -7,38 +7,45 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from kaspion.db import connect
+from kaspion.db import assign_natural_ids, connect
 
 
 def upsert_rows(rows: list[dict]) -> tuple[int, int]:
     """Write parsed rows into raw.transactions. Returns (added, updated).
 
-    Re-importing is safe and self-correcting: a row already present is refreshed
-    rather than duplicated, so overlapping date ranges and re-downloads of a
-    corrected statement both do the right thing.
+    Re-importing is safe: a row already present (by content — see
+    assign_natural_ids) is recognised and skipped rather than duplicated, so
+    overlapping date ranges import cleanly. A parser-assigned id (e.g. Isracard's
+    voucher number) is trusted and can still update in place if its own amount or
+    description changes; content-derived ids cannot, since the content changing
+    would make it a different key entirely — see assign_natural_ids's docstring
+    for why that trade-off was made.
     """
     if not rows:
         return 0, 0
     con = connect()
+    total = len(rows)
+    rows = assign_natural_ids(rows, con)
     before = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
-    con.executemany(
-        """
-        INSERT INTO raw.transactions
-            (transaction_id, account_id, account_type, posted_date,
-             amount, currency, raw_description, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (transaction_id) DO UPDATE SET
-            amount          = excluded.amount,
-            posted_date     = excluded.posted_date,
-            raw_description = excluded.raw_description
-        """,
-        [[r["transaction_id"], r["account_id"], r["account_type"], r["posted_date"],
-          r["amount"], r["currency"], r["raw_description"], r["source"]] for r in rows],
-    )
+    if rows:
+        con.executemany(
+            """
+            INSERT INTO raw.transactions
+                (transaction_id, account_id, account_type, posted_date,
+                 amount, currency, raw_description, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (transaction_id) DO UPDATE SET
+                amount          = excluded.amount,
+                posted_date     = excluded.posted_date,
+                raw_description = excluded.raw_description
+            """,
+            [[r["transaction_id"], r["account_id"], r["account_type"], r["posted_date"],
+              r["amount"], r["currency"], r["raw_description"], r["source"]] for r in rows],
+        )
     after = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
     con.close()
     added = after - before
-    return added, len(rows) - added
+    return added, total - added
 
 
 def detect_format(path: str | Path) -> str:

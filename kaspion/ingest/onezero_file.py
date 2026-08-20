@@ -15,12 +15,13 @@ Hebrew is stored back-to-front behind an LTR override (see _reading_order).
 """
 from __future__ import annotations
 
-import hashlib
 import re
 from datetime import date
 from pathlib import Path
 
-COL_DATE, COL_KIND, COL_DESC, COL_AMOUNT, COL_CURRENCY, COL_REF = 0, 2, 3, 4, 5, 8
+# column 8 was tried as a per-movement reference (COL_REF) and dropped — see the note
+# in parse_file() below for why
+COL_DATE, COL_KIND, COL_DESC, COL_AMOUNT, COL_CURRENCY = 0, 2, 3, 4, 5
 HEADER_CELL = "תאריך תנועה"
 
 # LTR/RTL overrides and marks the export wraps its Hebrew in
@@ -51,7 +52,8 @@ def parse_file(path: str | Path) -> list[dict]:
     book = xlrd.open_workbook(str(path))
     sheet = book.sheet_by_index(0)
     header = next(
-        (r for r in range(sheet.nrows) if str(sheet.cell_value(r, COL_DATE)).strip() == HEADER_CELL),
+        (r for r in range(sheet.nrows)
+         if str(sheet.cell_value(r, COL_DATE)).strip() == HEADER_CELL),
         None,
     )
     if header is None:
@@ -66,17 +68,12 @@ def parse_file(path: str | Path) -> list[dict]:
         y, m, d = xlrd.xldate_as_tuple(serial, book.datemode)[:3]
         description = _reading_order(str(sheet.cell_value(r, COL_DESC)))
         kind = _reading_order(str(sheet.cell_value(r, COL_KIND)))
-        reference = str(sheet.cell_value(r, COL_REF)).strip()
-        # The bank's reference is unique per movement, so re-importing an overlapping
-        # date range updates rows instead of duplicating them. A row without one falls
-        # back to its own content — otherwise every reference-less movement in the file
-        # would collapse onto a single id. Rows WITH a reference keep their original
-        # hash so previously imported movements are still recognised.
-        key = f"onezero|{reference}" if reference else (
-            f"onezero||{y:04d}-{m:02d}-{d:02d}|{amount}|{description}"
-        )
+        # transaction_id is intentionally NOT set here — COL_REF turned out not to be a
+        # stable per-movement reference (the same recurring standing order came back
+        # with a different value across two overlapping exports, minting a second id
+        # for one real transaction and duplicating it). kaspion.db.assign_natural_ids
+        # computes a content-based id downstream instead, which is stable regardless.
         rows.append({
-            "transaction_id": hashlib.sha256(key.encode()).hexdigest()[:16],
             "account_id": "onezero",
             "account_type": "bank",
             "posted_date": date(y, m, d).isoformat(),
@@ -88,13 +85,3 @@ def parse_file(path: str | Path) -> list[dict]:
             "source": "onezero",
         })
     return rows
-
-
-if __name__ == "__main__":
-    import sys
-
-    from kaspion.ingest.statements import upsert_rows
-
-    for arg in sys.argv[1:]:
-        added, updated = upsert_rows(parse_file(arg))
-        print(f"{Path(arg).name}: {added} new, {updated} updated")

@@ -1,14 +1,28 @@
-# Connecting the real banks — Max, Isracard, Bank Leumi
+# Connecting a real bank or credit card
 
 Step-by-step guide for when you're ready to switch from sample data to real data.
 Nothing here needs to happen now — the whole pipeline works on the seed until you do this.
 
-## What you'll set up
+## The easy way — from the dashboard
+
+Open the dashboard (`python3 -m kaspion.serve`) and press **➕ הוספת חשבון** in the
+sidebar. Pick the institution, fill in the fields it asks for, press the button. The
+server verifies the login before saving anything, then pulls 90 days of history and
+reloads the page with the account showing real data — no terminal needed. This is the
+supported path for a non-technical household member; the rest of this document is the
+manual/terminal equivalent, useful mainly for scripting a first bulk setup or debugging
+a failed login.
+
+**Isracard and Amex are the exception** — their login is blocked by reCAPTCHA (see
+`docs/AGENT_HANDOFF.md` §4) and appear greyed out in the dialog. Upload their statement
+`.xlsx` from the **תנועות** page instead. **ONE ZERO** needs a one-time 2FA enrollment
+the dialog can't do either — use its `.xls` app export the same way.
+
+## What you'll set up (terminal path)
 
 ```
-Bank Leumi (עו"ש)  ─┐
-Max (כרטיס אשראי)   ├─▶ israeli-bank-scrapers ─▶ raw.transactions ─▶ everything else, unchanged
-Isracard (כרטיס)    ─┘        (Node, local)
+any bank/card israeli-bank-scrapers   ─▶ israeli-bank-scrapers ─▶ raw.transactions ─▶ everything else, unchanged
+supports (leumi, max, beinleumi, …)          (Node, local)
 ```
 
 The scraper logs into each institution's website with your credentials (encrypted on disk),
@@ -34,19 +48,23 @@ This downloads `israeli-bank-scrapers` + a headless Chromium (~300 MB, used to d
 python3 -m kaspion.ingest.crypto
 ```
 
-It prompts per institution. What each one needs:
+It prompts per institution. `kaspion.ingest.crypto.COMPANY_FIELDS` lists every
+institution it knows (17, copied from `israeli-bank-scrapers` itself) with the exact
+fields each one needs — the prompt shows them for a known id. A few examples:
 
 | Company id | Type | Credential fields | Notes |
 |---|---|---|---|
 | `leumi` | bank | `username`, `password` | your leumi website login |
+| `beinleumi` | bank | `username`, `password` | הבינלאומי / FIBI |
 | `max` | credit_card | `username`, `password` | login for max.co.il |
-| `isracard` | credit_card | `id`, `card6Digits`, `password` | תעודת זהות, 6 ספרות אחרונות של הכרטיס, סיסמת האתר |
+| `visaCal` | credit_card | `username`, `password` | כאל |
+| `isracard` | credit_card | `id`, `card6Digits`, `password` | תעודת זהות, 6 ספרות אחרונות של הכרטיס, סיסמת האתר — **login is blocked by reCAPTCHA, use the XLSX upload instead** |
 
 Credentials are encrypted with AES-256-GCM into `data/credentials.json.enc`; the key file
 `data/.kaspion_key` gets 0600 permissions. Both are gitignored. Nothing is ever logged or
 passed on a command line.
 
-Start with ONE institution (recommend Leumi), verify, then add the cards.
+Start with ONE institution, verify, then add the rest.
 
 ## Step 3 — First real run
 
@@ -61,7 +79,7 @@ Expect this to take 1–3 minutes per institution (it's driving a real browser).
 ```bash
 python3 - <<'EOF'
 from kaspion.db import connect
-con = connect(read_only=True)
+con = connect()
 # 1. sign convention: charges/debits must be NEGATIVE
 print(con.execute("""
     select source, case when amount < 0 then 'outflow' else 'inflow' end, count(*), round(sum(amount))
@@ -76,8 +94,9 @@ EOF
 - If an institution reports charges as **positive**, negate its amounts in
   `scraper/scrape.js` (marked with a comment) — never downstream.
 - If your card debit description isn't caught, extend the regex in
-  `dbt/models/intermediate/int_card_payments.sql` and the mapping in
-  `dbt/tests/assert_card_debit_matches_statement.sql` with your real account ids.
+  `dbt/models/intermediate/int_card_payments.sql`. `dbt/tests/assert_card_payments_excluded.sql`
+  will fail if a bank-side card debit ever slips through uncaught into spend — that's the
+  test to watch after adding a new institution.
 
 ## Step 5 — Clean out the sample data
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # kaspion one-time setup: venv + dependencies + sanity-check pipeline run.
-# Usage:  bash scripts/setup.sh          (safe to re-run anytime)
+# Usage:  bash scripts/setup.sh          (safe to re-run anytime — empty database)
+#         bash scripts/setup.sh --demo   (loads 341 rows of synthetic sample data)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+DEMO=0
+[ "${1:-}" = "--demo" ] && DEMO=1
 
 # ---------- logging helpers ----------
 BOLD=$(tput bold 2>/dev/null || true); GREEN=$(tput setaf 2 2>/dev/null || true)
@@ -67,14 +70,18 @@ python3 -m pip install --quiet -e . || die "pip install failed — see output ab
 ok "installed: $(python3 -c 'import duckdb; print("duckdb", duckdb.__version__)')"
 ok "installed: $(dbt --version 2>/dev/null | grep -m1 'installed' | xargs || echo 'dbt-duckdb')"
 
-# ---------- 4. sample data + full pipeline sanity check ----------
-step "generating sample data"
-python3 kaspion/ingest/generate_seed.py
-
-step "running the pipeline (ingest -> dbt build + all tests -> dashboard)"
-python3 sync.py --skip-categorize
-ok "pipeline green — database at data/finance.duckdb"
-ok "dashboard written — open dashboard.html in a browser"
+# ---------- 4. database + full pipeline sanity check ----------
+if [ "$DEMO" = 1 ]; then
+  step "generating sample data (--demo)"
+  python3 kaspion/ingest/generate_seed.py
+  step "running the pipeline (ingest -> dbt build + all tests -> dashboard)"
+  python3 sync.py --source seed --skip-categorize
+  ok "pipeline green with sample data loaded"
+else
+  step "preparing an empty database (dbt build + all tests -> dashboard)"
+  python3 -m kaspion.cli init
+  ok "pipeline green — database is empty, ready for a real account"
+fi
 
 # ---------- 5. optional tools ----------
 step "checking optional tools"
@@ -93,9 +100,8 @@ fi
 echo
 echo "${BOLD}${GREEN}setup complete.${RESET}"
 echo "next steps:"
-echo "  open dashboard.html                     # the dashboard — sample data is already in it"
-echo "  source .venv/bin/activate               # in every new terminal"
-echo "  python3 sync.py --provider none         # run everything WITHOUT AI (no Ollama needed)"
-echo "  python3 sync.py                         # with Ollama: AI categorization"
-echo "  python3 -m kaspion.ingest.crypto        # bank credentials (encrypted)"
-echo "  python3 sync.py --source scraper        # real data (after: cd scraper && npm install)"
+echo "  python3 -m kaspion.serve                 # dashboard at http://127.0.0.1:8765"
+echo "  source .venv/bin/activate                # in every new terminal"
+echo "  python3 -m kaspion.ingest.crypto         # bank credentials (encrypted)"
+echo "  python3 sync.py                          # real data (after: cd scraper && npm install)"
+echo "  python3 sync.py --provider ollama        # opt in to AI categorization (needs Ollama)"

@@ -27,7 +27,7 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 
 | | |
 |---|---|
-| **Tool** | DuckDB — a free database that lives in one file: `data/finance.duckdb` |
+| **Tool** | DuckDB — a free database that lives in one file: `finance.duckdb`, in your per-user data folder (see the table at the bottom) |
 | **Command** | (automatic, part of `sync.py`) |
 | **What it does** | Saves every transaction once (duplicates are detected and skipped, so re-running is always safe). Also holds your corrections and budgets. |
 | **Why** | One private file = easy to back up (`cp`), impossible to leak. Like a tiny personal Snowflake. |
@@ -37,7 +37,7 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 | | |
 |---|---|
 | **Tool** | dbt — turns raw data into clean, tested tables using SQL |
-| **Command** | (automatic, part of `sync.py`) — manually: `cd dbt && DBT_PROFILES_DIR=. dbt build` |
+| **Command** | (automatic, part of `sync.py`) — manually: `python3 -m kaspion.pipeline build` |
 | **What it does** | Three smart things: **(a)** finds transfers between your own accounts and removes them from "spending" (moving money isn't spending); **(b)** finds the monthly credit-card debit (חיוב) on the bank account and removes it too — otherwise every shekel on the card would be counted twice; **(c)** computes budget pacing: "given it's the 12th of the month, are we ahead or behind?" |
 | **Why** | This is what makes the numbers on the dashboard *true*. Every rule is a tested model — 21 automatic checks run on every build. |
 
@@ -110,10 +110,20 @@ Remember: `source .venv/bin/activate` in every new terminal before running comma
 
 ## Where things live
 
+Your data lives **outside** the app folder, in the standard per-user location for your
+system — so uninstalling is deleting the app folder, and your data is a separate,
+easy-to-back-up folder:
+
+| System | Your data folder |
+|---|---|
+| macOS | `~/Library/Application Support/kaspion/` |
+| Windows | `%LOCALAPPDATA%\kaspion\` |
+| Linux | `~/.local/share/kaspion/` |
+
 | Path | What's inside |
 |---|---|
-| `data/finance.duckdb` | ALL your data — back this file up |
-| `dashboard.html` | the dashboard — regenerated on every sync, safe to delete |
-| `dbt/models/` | the SQL rules (transfers, card debits, budgets) |
-| `kaspion/` | the Python glue (ingest, AI, dashboard generator, CLI) |
+| `finance.duckdb` (data folder) | ALL your data — back this file up |
+| `dashboard.html` (data folder) | the dashboard — regenerated on every sync, safe to delete |
+| `dbt/models/` (app folder) | the SQL rules (transfers, card debits, budgets) |
+| `kaspion/` (app folder) | the Python glue (ingest, AI, dashboard generator, CLI) |
 | `docs/` | the full spec + build plan |

@@ -3,6 +3,6 @@ kaspion:
   outputs:
     dev:
       type: duckdb
-      path: ../data/finance.duckdb
+      path: "{{ env_var('KASPION_DB_PATH') }}"
       schema: main
       threads: 1
