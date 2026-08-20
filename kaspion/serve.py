@@ -101,7 +101,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/", "/dashboard.html"):
             if not OUT.exists():
-                _build_report()
+                # A data directory that holds a database but no dbt models (an install
+                # interrupted between the two, or KASPION_DATA_DIR moved) cannot build a
+                # report. Unguarded, that raised once PER REQUEST: a window full of
+                # tracebacks and a page that never loads. Say what to do instead.
+                try:
+                    _build_report()
+                except subprocess.CalledProcessError:
+                    self.send_error(
+                        500,
+                        "kaspion is not set up yet",
+                        "לא ניתן לבנות את הדשבורד — ייתכן שההתקנה לא הושלמה.\n"
+                        "הריצו שוב את install, או מהטרמינל: python3 -m kaspion.cli init",
+                    )
+                    return
             body = OUT.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

@@ -2,7 +2,12 @@
 name = "kaspion"
 version = "0.1.0"
 description = "Local-only, privacy-first household finance pipeline: DuckDB + dbt + AI categorization + self-contained HTML dashboard"
-requires-python = ">=3.10"
+# Upper bound is deliberate and load-bearing. dbt-core declares only ">=3.10", but it
+# fails on 3.14 ("UnserializableField: Field 'schema' ... is not serializable" out of
+# mashumaro) — so the resolver cannot protect us and we pin the ceiling here. Without
+# it a fresh `uv sync` picks the newest Python available and every install is broken,
+# which a developer on 3.11 never sees. Raise only after testing dbt on the new version.
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "duckdb>=1.1",
     "dbt-duckdb>=1.9",

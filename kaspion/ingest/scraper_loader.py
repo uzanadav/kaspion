@@ -21,6 +21,10 @@ from kaspion.ingest.crypto import (
 )
 
 SCRAPER_DIR = Path(__file__).resolve().parents[2] / "scraper"
+# Chromium lives inside the app folder, not the shared ~/.cache/puppeteer — see the
+# installer scripts. Must match PUPPETEER_CACHE_DIR there, or the scraper cannot find
+# the browser the installer downloaded.
+PUPPETEER_CACHE = SCRAPER_DIR.parent / ".puppeteer"
 # a captcha or stuck login leaves the headless browser waiting forever; the server that
 # calls this is single-threaded, so an unbounded scrape freezes the whole dashboard
 SCRAPE_TIMEOUT = 240
@@ -76,6 +80,11 @@ def _scrape_company(company: str, cfg: dict, days_back: int) -> list[dict]:
                 KASPION_CREDENTIALS=json.dumps(cfg["credentials"]),
                 KASPION_ACCOUNT_TYPE=cfg["type"],
                 KASPION_START_DATE=(date.today() - timedelta(days=days_back)).isoformat(),
+                # The installer downloads Chromium into the app folder rather than the
+                # shared per-user cache, so puppeteer has to be told where to look at
+                # RUN time too — without this it hunts the default cache, finds nothing,
+                # and every scrape fails with a missing-browser error.
+                PUPPETEER_CACHE_DIR=str(PUPPETEER_CACHE),
             ),
             capture_output=True,
             text=True,

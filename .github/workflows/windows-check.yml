@@ -128,3 +128,95 @@ jobs:
 
       - name: Frontend syntax
         run: node --check kaspion/assets/app.js
+
+  # The thing an actual user does: unzip and double-click install.bat. Runs the real
+  # installer with nothing preinstalled — no Python, no Node — so it also proves uv
+  # brings its own interpreter and nodejs-wheel brings Node. Separate job because it
+  # downloads ~1.2GB (Chromium included) and takes minutes.
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run the real installer (install.bat)
+        run: .\install.bat
+        shell: cmd
+
+      - name: The installer produced a working, self-contained install
+        shell: python
+        run: |
+          import os, subprocess, sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          venv_python = root / ".venv" / "Scripts" / "python.exe"
+          assert (root / ".tools" / "uv.exe").exists(), "uv was not vendored into the app folder"
+          assert venv_python.exists(), ".venv was not created"
+
+          # The Python ceiling matters: dbt breaks on 3.14, and uv picks the newest
+          # allowed version, so a missing upper bound silently breaks every install.
+          version = subprocess.run([str(venv_python), "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
+                                   capture_output=True, text=True, check=True).stdout.strip()
+          print("python:", version)
+          assert tuple(map(int, version.split("."))) < (3, 14), f"dbt cannot run on {version}"
+
+          # Chromium must live INSIDE the app folder, or "uninstall = delete the folder"
+          # is false and the scraper cannot find the browser at run time.
+          cache = root / ".puppeteer"
+          assert cache.exists(), "the browser was not downloaded into the app folder"
+          size_mb = sum(f.stat().st_size for f in cache.rglob("*") if f.is_file()) / 1e6
+          print(f".puppeteer: {size_mb:.0f} MB")
+          assert size_mb > 100, f"browser download looks truncated ({size_mb:.0f} MB)"
+          print("OK: self-contained install")
+
+      - name: The installed app launches a browser and finds its own Chromium
+        shell: python
+        run: |
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          # exercise the real path: scraper_loader -> node.exe -> puppeteer -> Chromium.
+          # An unknown company fails inside the scraper AFTER the browser is up, so this
+          # proves the browser resolved without contacting any bank.
+          code = (
+              "from kaspion.ingest.scraper_loader import _scrape_company, ScrapeError, PUPPETEER_CACHE\n"
+              "print('cache:', PUPPETEER_CACHE)\n"
+              "try:\n"
+              "    _scrape_company('not-a-real-company', {'credentials': {'username': 'x', 'password': 'x'}, 'type': 'bank'}, days_back=1)\n"
+              "except ScrapeError as e:\n"
+              "    print('ScrapeError:', e.error_type)\n"
+          )
+          out = subprocess.run([str(root / ".tools" / "uv.exe"), "run", "python", "-c", code],
+                               capture_output=True, text=True, encoding="utf-8")
+          print(out.stdout)
+          print(out.stderr[-2000:])
+          assert "cache:" in out.stdout, "scraper_loader did not resolve its browser cache"
+          assert "Failed to launch" not in out.stderr, "puppeteer could not launch the bundled browser"
+          print("OK: bundled Chromium reachable from the app")
+
+      - name: The launcher starts the server and serves the dashboard
+        shell: python
+        run: |
+          import subprocess, time, urllib.request
+          from pathlib import Path
+
+          root = Path.cwd()
+          proc = subprocess.Popen([str(root / ".tools" / "uv.exe"), "run", "python", "-m", "kaspion.serve"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, encoding="utf-8")
+          try:
+              body = ""
+              for _ in range(30):
+                  time.sleep(2)
+                  try:
+                      body = urllib.request.urlopen("http://127.0.0.1:8765/", timeout=5).read().decode("utf-8")
+                      break
+                  except Exception:
+                      if proc.poll() is not None:
+                          raise SystemExit("server exited:\n" + (proc.stdout.read() or ""))
+              assert "<title>" in body, "server did not serve the dashboard"
+              assert "עדיין אין נתונים" in body, "fresh install should show the empty state"
+              print("OK: launcher serves the empty-state dashboard")
+          finally:
+              proc.kill()
