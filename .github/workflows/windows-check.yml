@@ -1,0 +1,222 @@
+# Verifies the cross-platform work on a REAL x64 Windows box. The developer machine is
+# an arm64 Mac, so these paths (LOCALAPPDATA, cp1255 consoles, .venv\Scripts layout,
+# node.exe resolution) cannot be exercised locally — only asserted about.
+#
+# Checks are written as `shell: python` blocks rather than `python -c "..."`: the inline
+# form has to survive PowerShell quoting, which silently mangled the escaped quotes and
+# produced a SyntaxError instead of running the test.
+name: windows-check
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install kaspion (pulls Node in via nodejs-wheel)
+        run: python -m pip install --quiet -e ".[dev]"
+
+      # Phase 1: data must resolve under %LOCALAPPDATA%, never into the source tree.
+      - name: Per-user data directory resolves under LOCALAPPDATA
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          from kaspion.paths import data_dir, db_path
+
+          d, local, repo = data_dir().resolve(), Path(os.environ["LOCALAPPDATA"]).resolve(), Path.cwd().resolve()
+          print("data_dir:", d)
+          print("db_path :", db_path())
+          assert d == local / "kaspion", f"not under LOCALAPPDATA: {d}"
+          assert repo not in d.parents, f"data dir is inside the source tree: {d}"
+          print("OK: per-user data dir is outside the repo")
+
+      # Phase 5: Node must come from the wheel, next to python.exe — no system Node.
+      - name: Bundled Node resolves and is new enough
+        shell: python
+        run: |
+          import subprocess
+          from kaspion.ingest.scraper_loader import _node_bin
+
+          nb = _node_bin()
+          version = subprocess.run([nb, "--version"], capture_output=True, text=True, check=True).stdout.strip()
+          print("node bin:", nb)
+          print("node version:", version)
+          assert nb.lower().endswith("node.exe"), f"expected node.exe on Windows, got {nb}"
+          assert int(version.lstrip("v").split(".")[0]) >= 22, \
+              f"israeli-bank-scrapers needs Node >= 22.22.2, got {version}"
+          print("OK: bundled node.exe resolved")
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      # Phase 3: a brand-new install must produce an EMPTY database and a valid dashboard,
+      # with dbt driven through kaspion.pipeline (never a bare `dbt`, not on PATH here).
+      - name: Clean first run (kaspion init) produces an empty database
+        run: python -m kaspion.cli init
+
+      - name: Verify the fresh install is empty
+        shell: python
+        run: |
+          import json, re
+          import duckdb
+          from kaspion.paths import db_path, report_path
+
+          con = duckdb.connect(str(db_path()))
+          rows = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
+          con.close()
+          print("rows:", rows)
+          assert rows == 0, f"fresh install is not empty: {rows} rows"
+
+          page = report_path()
+          assert page.exists(), "dashboard.html was not generated"
+          data = json.loads(re.search(r"const DATA = (.*?);\n", page.read_text(encoding="utf-8")).group(1))
+          assert data["months"] == [], f"expected no months, got {len(data['months'])}"
+          assert data["startKey"] == "", f"expected empty startKey, got {data['startKey']!r}"
+          print("OK: empty database + empty-state dashboard")
+
+      # Phase 2: Hebrew must survive Windows subprocess pipes (cp1255 is the default
+      # there, which previously corrupted every merchant name).
+      - name: Hebrew survives subprocess pipes
+        shell: python
+        run: |
+          import subprocess, sys
+
+          expected = "בדיקה ₪ ✔"
+          out = subprocess.run(
+              [sys.executable, "-c", f'print("{expected}")'],
+              capture_output=True, text=True, encoding="utf-8", check=True,
+          ).stdout.strip()
+          print("round-tripped:", out)
+          assert out == expected, f"Hebrew corrupted through the pipe: {out!r}"
+          print("OK: Hebrew round-trips")
+
+      # Phase 2/3a: the seed CSV path (Windows backslashes) must survive being bound
+      # into DuckDB SQL — it used to be interpolated into a quoted literal.
+      - name: Seed loader handles Windows paths
+        run: |
+          python -m kaspion.ingest.generate_seed
+          python sync.py --source seed --skip-categorize
+
+      - name: Verify the seed actually loaded
+        shell: python
+        run: |
+          import duckdb
+          from kaspion.paths import db_path
+
+          con = duckdb.connect(str(db_path()))
+          rows = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
+          con.close()
+          print("rows after explicit seed load:", rows)
+          assert rows > 0, "seed load failed on a Windows path"
+          print("OK: backslash path bound into SQL correctly")
+
+      - name: Frontend syntax
+        run: node --check kaspion/assets/app.js
+
+  # The thing an actual user does: unzip and double-click install.bat. Runs the real
+  # installer with nothing preinstalled — no Python, no Node — so it also proves uv
+  # brings its own interpreter and nodejs-wheel brings Node. Separate job because it
+  # downloads ~1.2GB (Chromium included) and takes minutes.
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run the real installer (install.bat)
+        run: .\install.bat
+        shell: cmd
+
+      - name: The installer produced a working, self-contained install
+        shell: python
+        run: |
+          import os, subprocess, sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          venv_python = root / ".venv" / "Scripts" / "python.exe"
+          assert (root / ".tools" / "uv.exe").exists(), "uv was not vendored into the app folder"
+          assert venv_python.exists(), ".venv was not created"
+
+          # The Python ceiling matters: dbt breaks on 3.14, and uv picks the newest
+          # allowed version, so a missing upper bound silently breaks every install.
+          version = subprocess.run([str(venv_python), "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
+                                   capture_output=True, text=True, check=True).stdout.strip()
+          print("python:", version)
+          assert tuple(map(int, version.split("."))) < (3, 14), f"dbt cannot run on {version}"
+
+          # Chromium must live INSIDE the app folder, or "uninstall = delete the folder"
+          # is false and the scraper cannot find the browser at run time.
+          cache = root / ".puppeteer"
+          assert cache.exists(), "the browser was not downloaded into the app folder"
+          size_mb = sum(f.stat().st_size for f in cache.rglob("*") if f.is_file()) / 1e6
+          print(f".puppeteer: {size_mb:.0f} MB")
+          assert size_mb > 100, f"browser download looks truncated ({size_mb:.0f} MB)"
+          print("OK: self-contained install")
+
+      - name: The installed app launches a browser and finds its own Chromium
+        shell: python
+        run: |
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          # exercise the real path: scraper_loader -> node.exe -> puppeteer -> Chromium.
+          # An unknown company fails inside the scraper AFTER the browser is up, so this
+          # proves the browser resolved without contacting any bank.
+          code = (
+              "from kaspion.ingest.scraper_loader import _scrape_company, ScrapeError, PUPPETEER_CACHE\n"
+              "print('cache:', PUPPETEER_CACHE)\n"
+              "try:\n"
+              "    _scrape_company('not-a-real-company', {'credentials': {'username': 'x', 'password': 'x'}, 'type': 'bank'}, days_back=1)\n"
+              "except ScrapeError as e:\n"
+              "    print('ScrapeError:', e.error_type)\n"
+          )
+          out = subprocess.run([str(root / ".tools" / "uv.exe"), "run", "python", "-c", code],
+                               capture_output=True, text=True, encoding="utf-8")
+          print(out.stdout)
+          print(out.stderr[-2000:])
+          assert "cache:" in out.stdout, "scraper_loader did not resolve its browser cache"
+          assert "Failed to launch" not in out.stderr, "puppeteer could not launch the bundled browser"
+          print("OK: bundled Chromium reachable from the app")
+
+      - name: The launcher starts the server and serves the dashboard
+        shell: python
+        run: |
+          import subprocess, time, urllib.request
+          from pathlib import Path
+
+          root = Path.cwd()
+          proc = subprocess.Popen([str(root / ".tools" / "uv.exe"), "run", "python", "-m", "kaspion.serve"],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, encoding="utf-8")
+          try:
+              body = ""
+              for _ in range(30):
+                  time.sleep(2)
+                  try:
+                      body = urllib.request.urlopen("http://127.0.0.1:8765/", timeout=5).read().decode("utf-8")
+                      break
+                  except Exception:
+                      if proc.poll() is not None:
+                          raise SystemExit("server exited:\n" + (proc.stdout.read() or ""))
+              assert "<title>" in body, "server did not serve the dashboard"
+              assert "עדיין אין נתונים" in body, "fresh install should show the empty state"
+              print("OK: launcher serves the empty-state dashboard")
+          finally:
+              proc.kill()

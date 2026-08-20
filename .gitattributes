@@ -1,0 +1,4 @@
+# git archive (used to build the distributable release zip, see scripts/build-release.sh)
+# must not ship the 341-row synthetic demo dataset. It stays tracked and available for
+# local development — this only affects the archive, never a normal clone or checkout.
+dbt/seeds/sample_transactions.csv export-ignore

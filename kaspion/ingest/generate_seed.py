@@ -6,12 +6,14 @@ equal each card's statement sum (so card-payment detection has real work to do).
 """
 from __future__ import annotations
 
+import calendar
 import csv
-import hashlib
 import random
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
+
+from kaspion.db import DDL, assign_natural_ids
 
 OUT = Path(__file__).resolve().parents[2] / "dbt" / "seeds" / "sample_transactions.csv"
 
@@ -69,9 +71,7 @@ def generate(months_back: int = 6, seed: int = 42) -> list[dict]:
     # "this month" view has data); future-dated rows are filtered at the end.
     for month_start in [*month_range(months_back), today.replace(day=1)]:
         y, m = month_start.year, month_start.month
-        days_in_month = (
-            (month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        ).day
+        days_in_month = calendar.monthrange(y, m)[1]
 
         # salary (inflow) on the 9th
         rows.append(_row("leumi-main", date(y, m, 9), 24500.00, "משכורת חברת הייטק בעמ"))
@@ -93,7 +93,8 @@ def generate(months_back: int = 6, seed: int = 42) -> list[dict]:
         # card statement debit hits the bank on the 10th of NEXT month
         debit_date = (month_start + timedelta(days=40)).replace(day=10)
         for card, total in card_totals.items():
-            rows.append(_row(CARD_TO_BANK[card], debit_date, round(total, 2), CARD_DEBIT_DESC[card]))
+            rows.append(_row(CARD_TO_BANK[card], debit_date, round(total, 2),
+                              CARD_DEBIT_DESC[card]))
 
     return [r for r in rows if date.fromisoformat(r["posted_date"]) <= today]
 
@@ -110,19 +111,19 @@ def _row(account_id: str, posted: date, amount: float, desc: str) -> dict:
     }
 
 
-def assign_ids(rows: list[dict]) -> None:
-    """Stable id = hash(natural key + occurrence index). Prevents same-day duplicate collisions."""
-    counts: dict[tuple, int] = defaultdict(int)
-    for r in rows:
-        key = (r["posted_date"], r["amount"], r["raw_description"], r["account_id"])
-        counts[key] += 1
-        raw = "|".join([*key, str(counts[key])])
-        r["transaction_id"] = hashlib.sha256(raw.encode()).hexdigest()[:16]
-
-
 if __name__ == "__main__":
+    import duckdb
+
     rows = generate()
-    assign_ids(rows)
+    # a throwaway in-memory connection just to reuse assign_natural_ids's id scheme —
+    # the same natural-key logic every real ingest path uses, rather than a second,
+    # hand-rolled one here. Its "already in the database" check is always a no-op
+    # against an empty table; what it actually buys is collapsing the astronomically
+    # rare random-draw collision (same day/amount/merchant/account) to one row instead
+    # of keeping both under different ids, consistent with every other ingest path.
+    con = duckdb.connect(":memory:")
+    con.execute(DDL)
+    rows = assign_natural_ids(rows, con)
     rows.sort(key=lambda r: r["posted_date"])
     with OUT.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))

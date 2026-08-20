@@ -17,4 +17,6 @@ where account_type = 'bank'
       -- would count the whole card statement a second time on top of the card's
       -- own charges, so the issuer names are matched on their own too.
       or regexp_matches(raw_description, '(מקס איט|ישראכרט|לאומי קארד|כאל בע|אמריקן אקספרס)')
+      -- FIBI/Beinleumi names no issuer at all, just "<last 4 digits> - כרטיסי אשראי לי"
+      or raw_description like '%כרטיסי אשראי%'
   )

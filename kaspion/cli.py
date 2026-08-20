@@ -25,7 +25,8 @@ def recategorize(merchant: str, category: str) -> None:
     con = connect()
     # normalize exactly like stg_transactions.merchant_key
     key = con.execute(
-        r"SELECT trim(regexp_replace(regexp_replace(lower(trim(?)), '\s+\d+$', ''), '\s+', ' ', 'g'))",
+        r"SELECT trim(regexp_replace(regexp_replace(lower(trim(?)), "
+        r"'\s+\d+$', ''), '\s+', ' ', 'g'))",
         [merchant],
     ).fetchone()[0]
     con.execute(
@@ -38,7 +39,8 @@ def recategorize(merchant: str, category: str) -> None:
         [key, category],
     )
     con.close()
-    print(f"override saved: '{key}' -> {category}. run `python3 sync.py --skip-categorize` to rebuild.")
+    print(f"override saved: '{key}' -> {category}. "
+          "run `python3 sync.py --skip-categorize` to rebuild.")
 
 
 # 'other' is the fallback every uncategorized row lands on and 'income' is how
@@ -96,7 +98,8 @@ def delete_category(category_id: str) -> int:
         [category_id],
     )
     con.execute(
-        "UPDATE state.ai_proposals SET proposed_category_id = 'other' WHERE proposed_category_id = ?",
+        "UPDATE state.ai_proposals SET proposed_category_id = 'other' "
+        "WHERE proposed_category_id = ?",
         [category_id],
     )
     con.execute("DELETE FROM state.budgets WHERE category_id = ?", [category_id])
@@ -153,6 +156,20 @@ def add_transaction(
     return txn_id
 
 
+def init() -> None:
+    """Prepare a brand-new installation: empty database, dbt models, empty dashboard.
+    Idempotent — safe to re-run on an existing install."""
+    from kaspion.paths import data_dir
+    from kaspion.pipeline import run_dbt
+    from kaspion.report import build_report
+
+    data_dir().mkdir(parents=True, exist_ok=True)
+    connect().close()          # lays down the DDL (schemas + tables), inserts nothing
+    run_dbt()
+    build_report()
+    print(f"kaspion ready. data dir: {data_dir()}")
+
+
 def reset_sample_data() -> None:
     """Remove the synthetic seed data + its AI proposals — run before first real scrape.
     (Cross-platform replacement for the old shell one-liner.)"""
@@ -180,6 +197,7 @@ def remove_transaction(txn_id: str) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="kaspion")
     sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("init", help="prepare a new installation (empty database)")
     r = sub.add_parser("recategorize", help="correct a merchant's category (remembered forever)")
     r.add_argument("merchant")
     r.add_argument("category")
@@ -200,7 +218,9 @@ def main() -> None:
     dc = sub.add_parser("delete-category", help="delete a category you added")
     dc.add_argument("category_id")
     args = p.parse_args()
-    if args.cmd == "recategorize":
+    if args.cmd == "init":
+        init()
+    elif args.cmd == "recategorize":
         recategorize(args.merchant, args.category)
     elif args.cmd == "set-budget":
         set_budget(args.category, args.amount)
@@ -214,7 +234,8 @@ def main() -> None:
         reset_sample_data()
     elif args.cmd == "add-category":
         add_category(args.category_id, args.name)
-        print(f"category added: {args.category_id}. run `python3 sync.py --skip-categorize` to rebuild.")
+        print(f"category added: {args.category_id}. "
+              "run `python3 sync.py --skip-categorize` to rebuild.")
     elif args.cmd == "delete-category":
         moved = delete_category(args.category_id)
         print(f"category deleted ({moved} merchants moved to 'other'). rebuild to apply.")

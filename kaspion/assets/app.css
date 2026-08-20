@@ -1,0 +1,416 @@
+:root {
+  /* tells the browser which native control colors (form fields, scrollbars) to use per theme */
+  color-scheme: light dark;
+  /* type scale */  --t1:.72rem; --t2:.82rem; --t3:.95rem; --t4:1.15rem; --t5:1.6rem; --t6:2.4rem;
+  /* spacing    */  --s1:4px; --s2:8px; --s3:12px; --s4:18px; --s5:26px; --s6:38px;
+  /* radius     */  --r1:10px; --r2:14px; --r3:20px;
+  /* surfaces   */  --bg:#faf7f2; --surface:#ffffff; --surface-2:#f4efe7; --line:#e9e2d6;
+  /* ink        */  --ink:#2f2c27; --ink-2:#6b655c; --ink-3:#989186;
+  /* semantic   */  --pos:#0e9f6e; --neg:#dc2626; --warn:#ca8a04; --accent:#c9b48a;
+  /* status pills (badges/banners) — tinted background + matching ink, one pair per state */
+  --pos-bg:#e7f6ee; --pos-ink:#116646; --warn-bg:#fdf3e0; --warn-ink:#8a5a00;
+  --neg-bg:#fdebec; --neg-ink:#a12b30;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  /* aliases kept so existing rules keep working during migration */
+  --green:var(--pos); --red:var(--neg); --gray:var(--ink-3);
+  --soft:var(--ink-2); --card:var(--surface); --sel:var(--surface-2);
+}
+/* dark: only tokens are redefined. Guarded so an explicit light choice still wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#131316; --surface:#1b1b1f; --surface-2:#26262c; --line:#33333b;
+    --ink:#ececf0; --ink-2:#a8a5ad; --ink-3:#77747c;
+    --pos:#12ad82; --neg:#e04a48; --warn:#a67c1a; --accent:#8a7b55;
+    --pos-bg:rgba(18,173,130,.18); --pos-ink:#4ad9ab;
+    --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
+    --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+  }
+}
+/* explicit toggle wins in BOTH directions */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#131316; --surface:#1b1b1f; --surface-2:#26262c; --line:#33333b;
+  --ink:#ececf0; --ink-2:#a8a5ad; --ink-3:#77747c;
+  --pos:#12ad82; --neg:#e04a48; --warn:#a67c1a; --accent:#8a7b55;
+  --pos-bg:rgba(18,173,130,.18); --pos-ink:#4ad9ab;
+  --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
+  --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+}
+:root[data-theme="light"] { color-scheme: light }
+* { box-sizing:border-box; margin:0 }
+html { font-size:17.5px }
+body { font-family:-apple-system, "Segoe UI", "Heebo", Arial, sans-serif;
+       background:var(--bg); color:var(--ink); padding:24px 260px 60px 36px }
+
+/* Dates, times, ranges, amounts and account ids are LTR runs inside RTL text.
+   Without isolation the bidi algorithm reorders adjacent runs — "13.08.2026 11:01"
+   renders as "11:01 13.08.2026" even though the DOM text is correct. isolate is
+   what stops that leak; it does not change the text, only how it lays out. */
+/* text-align:end is needed alongside direction:ltr — forcing ltr on a table cell also
+   flips its own start/end alignment, which would pull numbers away from their header */
+.num { unicode-bidi:isolate; direction:ltr; display:inline-block; text-align:end }
+.nums { font-variant-numeric:tabular-nums }
+
+/* ---- brand mark: small fish logo, pinned to the physical top-left corner
+   regardless of RTL (the sidebar already owns the right rail) ---- */
+.brand-mark { position:fixed; top:28px; left:28px; z-index:5;
+        filter:drop-shadow(0 1px 3px rgba(0,0,0,.25)) }
+
+/* ---- sidebar (right rail, RTL-natural; bottom bar on mobile) ---- */
+#side { position:fixed; inset-inline-start:0; top:0; bottom:0; width:224px; background:var(--card);
+        border-inline-end:1px solid var(--line); padding:26px 14px; display:flex; flex-direction:column }
+#side .logo { font-size:1.25rem; font-weight:800; text-align:center; margin-bottom:4px }
+#side .tag  { font-size:.7rem; color:var(--soft); text-align:center; margin-bottom:26px }
+#side nav { display:flex; flex-direction:column; gap:6px }
+#side nav a { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px;
+        text-decoration:none; color:var(--ink); font-size:.95rem; cursor:pointer }
+#side nav a:hover { background:var(--bg) }
+#side nav a.on { background:var(--sel); font-weight:700 }
+#side nav a .ico { font-size:1.15rem }
+#side .foot { margin-top:auto; font-size:.68rem; color:var(--soft); text-align:center; line-height:1.7 }
+#syncbtn { margin-top:18px; padding:11px; border-radius:12px; border:1px solid var(--line);
+        background:var(--card); color:var(--ink); font:inherit; font-size:.9rem; cursor:pointer }
+#syncbtn:hover { background:var(--sel) }
+#syncbtn:disabled { opacity:.55; cursor:wait }
+#addacct { margin-top:8px; padding:11px; border-radius:12px; border:1px dashed var(--accent);
+        background:none; color:var(--ink); font:inherit; font-size:.9rem; cursor:pointer }
+#addacct:hover { background:var(--sel) }
+#addacct:disabled { opacity:.55; cursor:wait }
+#themebtn { margin-top:8px; padding:9px; border-radius:12px; border:1px solid transparent;
+        background:none; color:var(--ink-2); font:inherit; font-size:.82rem; cursor:pointer }
+#themebtn:hover { background:var(--sel); border-color:var(--line) }
+
+/* ---- header ---- */
+/* content hugs the sidebar on the right instead of floating in the middle */
+.head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;
+        max-width:1280px; margin-inline-start:0; margin-inline-end:auto }
+h1 { font-size:1.45rem }
+/* month strip: every month is one tap away */
+.months { display:flex; gap:7px; max-width:1280px; margin:0 0 20px auto; overflow-x:auto;
+        padding-bottom:4px; -webkit-overflow-scrolling:touch }
+.mchip { flex:none; padding:8px 16px; border-radius:20px; border:1px solid var(--line);
+        background:var(--card); font:inherit; font-size:.88rem; cursor:pointer; color:var(--ink) }
+.mchip:hover { background:var(--sel) }
+.mchip.sel { background:var(--ink); border-color:var(--ink); color:var(--bg); font-weight:700 }
+.mchip .now { display:inline-block; width:7px; height:7px; border-radius:50%;
+        background:var(--green); margin-inline-start:6px; vertical-align:middle }
+.sub { color:var(--soft); font-size:.85rem; max-width:1280px; margin:0 0 14px auto }
+main { max-width:1280px; margin-inline-start:0; margin-inline-end:auto }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 22px; align-items:start }
+@media (max-width:1000px) { .grid2 { grid-template-columns:1fr } }
+.view { display:none } .view.on { display:block }
+h2 { font-size:1.05rem; margin:26px 0 12px }
+.hint { font-size:.75rem; color:var(--soft) }
+
+/* ---- cards & banner ---- */
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
+.card { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s4) var(--s3); text-align:center; box-shadow:var(--shadow) }
+.card .lbl { font-size:var(--t2); color:var(--soft) }
+.card .val { font-size:var(--t5); font-weight:700; margin-top:4px }
+/* money coming in gets its own accent + dominant size — it's the figure the eye lands on first */
+.card.in { background:linear-gradient(180deg,var(--pos-bg),var(--surface)); border-color:var(--pos-bg) }
+.card.in .val { color:var(--green); font-size:var(--t6) }
+.card .sub2 { font-size:.68rem; color:var(--soft); margin-top:3px; min-height:1em }
+/* the pace now rides in the spend card's subline, so it needs its own colour rule —
+   .good/.bad elsewhere are scoped to .val/.rpct and would not apply here */
+.card .sub2 .good { color:var(--green); font-weight:600 }
+.card .sub2 .bad  { color:var(--red);   font-weight:600 }
+@media (max-width:900px) { .cards { grid-template-columns:repeat(2,1fr) } }
+.val.good { color:var(--green) } .val.bad { color:var(--red) }
+.banner { margin:14px 0 0; padding:13px 16px; border-radius:14px; font-weight:600; font-size:.95rem }
+.banner.good { background:var(--pos-bg); color:var(--pos-ink) } .banner.bad { background:var(--neg-bg); color:var(--neg-ink) }
+/* global error surface for actions with no form of their own nearby (delete a row,
+   recategorize, edit a budget) — those used to report failure into #a-msg, a message div
+   hidden inside the collapsed add-transaction toolbar, so a failed request looked like
+   nothing happened at all. This sits outside every view, fixed, so it is visible no matter
+   which page or scroll position the action was fired from. */
+.toast { display:none; position:fixed; bottom:20px; inset-inline:20px; margin-inline:auto;
+        max-width:420px; z-index:50; background:var(--neg-bg); color:var(--neg-ink);
+        padding:12px 16px; border-radius:var(--r2); font-size:.85rem; font-weight:600;
+        box-shadow:var(--shadow); text-align:center; cursor:pointer }
+.toast.on { display:block }
+/* insight strip: short computed observations, same connected-list look as .srcgrid */
+.insights { display:flex; flex-direction:column; gap:1px; background:var(--line);
+        border-radius:var(--r1); overflow:hidden; border:1px solid var(--line) }
+.ins { display:flex; align-items:center; gap:var(--s3); padding:var(--s2) var(--s4);
+       background:var(--surface); font-size:var(--t2) }
+.ins-dot { width:7px; height:7px; border-radius:50%; flex:none; background:var(--ink-3) }
+.ins.good .ins-dot { background:var(--pos) }
+.ins.bad .ins-dot  { background:var(--neg) }
+.ins.go { cursor:pointer }
+.ins.go:hover { background:var(--surface-2) }
+.ins-txt { flex:1; min-width:0 }
+.ins-go { color:var(--ink-3); font-size:var(--t4); flex:none }
+.panel { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s4); box-shadow:var(--shadow) }
+
+/* ---- overview: donut + legend + top5 ---- */
+.split { display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:center }
+.donut-wrap { position:relative; width:210px; height:210px; margin:0 auto }
+.donut-wrap svg { transform:rotate(-90deg) }
+.donut-c { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center }
+.donut-c .b { font-size:1.3rem; font-weight:800 } .donut-c .s { font-size:.72rem; color:var(--soft) }
+.legend { display:flex; flex-direction:column; gap:8px }
+.leg { display:flex; align-items:center; gap:9px; font-size:.88rem; cursor:pointer; padding:5px 8px; border-radius:10px }
+.leg:hover { background:var(--bg) }
+.leg .dot { width:11px; height:11px; border-radius:4px; flex:none }
+.leg .nm { flex:1 } .leg .am { font-weight:600 }
+
+/* ---- categories view ---- */
+.cat { margin-bottom:var(--s1); padding:var(--s3); border-radius:var(--r1); cursor:pointer; transition:background .15s }
+.cat:hover { background:var(--bg) }
+.cat-line { display:flex; justify-content:space-between; font-size:var(--t3); margin-bottom:5px }
+.cat-amt small { color:var(--soft); font-weight:400 }
+.sugg-tag { font-size:.62rem; font-weight:600; color:var(--warn-ink); background:var(--warn-bg);
+        padding:1px 7px; border-radius:8px; margin-inline-start:6px; cursor:help }
+/* progress fill anchors to the RIGHT and grows leftward (natural for Hebrew) */
+.bar { height:9px; background:var(--line); border-radius:6px; overflow:hidden;
+       display:flex; justify-content:flex-start }
+.fill { height:100%; border-radius:6px }
+
+/* ---- trends: income vs spend ---- */
+/* Real pixels, not a scaled viewBox: a viewBox that stretches to its container scales the
+   type with it and 11px labels become 6px on a phone. drawFlow() measures clientWidth. */
+.fsvg { display:block }
+.fsvg .grid { stroke:var(--line); stroke-width:1 }
+.fsvg .fax, .fsvg .fmon { fill:var(--soft); font-size:.62rem }
+/* the axis top is money: an LTR run inside an RTL page, isolated like every .num */
+.fsvg .fax { direction:ltr; unicode-bidi:isolate }
+.fsvg .fmon.sel { fill:var(--ink); font-weight:700 }
+/* colour alone is not enough separation for deuteranopia on the dark surface (ΔE 7.9),
+   so each line also carries its own name at its last point */
+.fsvg .flab { font-size:.66rem; font-weight:700 }
+/* the hit box carries the tooltip, the hover highlight and the month click. fill:none
+   receives NO pointer events — that is why .tinc's title never fired — so it is filled
+   with transparent and told explicitly to accept the pointer. */
+.fsvg .hit { cursor:pointer; pointer-events:all }
+.fsvg .hit:hover { fill:var(--ink); fill-opacity:.05 }
+.fsvg .hit.sel  { fill:var(--accent); fill-opacity:.12 }
+.tlegend { display:flex; flex-wrap:wrap; gap:var(--s4); font-size:var(--t2); color:var(--soft);
+        margin-bottom:var(--s3) }
+.tkey { display:inline-flex; align-items:center; gap:7px }
+.tkey i { width:18px; border-top:3px solid currentColor }
+.tkey i.inc { border-color:var(--green) }
+.tkey i.sp  { border-color:var(--red) }
+.tkey i.dsh { border-top-style:dashed; border-color:var(--ink-3) }
+.tkey b { width:11px; height:11px; border-radius:4px }
+.tlab { font-size:.72rem; color:var(--soft); margin-top:5px; text-align:center }
+.tlab.sel { color:var(--green); font-weight:700 }
+
+/* ---- trends: spend by card, stacked ---- */
+.stack { display:flex; gap:8px; align-items:flex-end; justify-content:space-between }
+.scol { flex:1; min-width:0 }
+/* column-reverse so segments stack up from the baseline; the 2px surface gap is carved
+   OUT of each segment via border-bottom (box-sizing is border-box globally), so the stack
+   still measures its true total instead of being inflated by the gaps */
+.sbar { height:150px; display:flex; flex-direction:column-reverse; justify-content:flex-start }
+.sseg { border-bottom:2px solid var(--card); cursor:pointer }
+.sbar > .sseg:first-child { border-bottom:0 }
+.sseg:hover { filter:brightness(1.15) }
+.sbar > .sseg:last-child { border-radius:5px 5px 0 0 }
+
+/* ---- trends: top destinations ---- */
+.dests { display:flex; flex-direction:column; gap:7px }
+.dest { display:grid; grid-template-columns:minmax(0,1fr) 40% auto; gap:10px;
+        align-items:center; font-size:var(--t2); cursor:pointer; padding:3px 5px;
+        border-radius:var(--r1) }
+.dest:hover { background:var(--bg) }
+.dname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* the fill grows from the RIGHT — the start edge in an RTL row, same as .bar/.fill */
+.dbar { height:10px; background:var(--line); border-radius:6px; overflow:hidden;
+        display:flex; justify-content:flex-start }
+.dbar i { height:100%; background:var(--accent); border-radius:6px }
+.damt { font-weight:600; white-space:nowrap }
+
+/* ---- trends: savings rate ---- */
+.rate { display:flex; gap:8px; align-items:flex-end; justify-content:space-between }
+.rcol { flex:1; text-align:center; cursor:pointer }
+/* zero line through the middle: savings and overspend read as opposite directions, not
+   as two bars of different colours */
+.rbars { height:110px; position:relative }
+.rbars::before { content:''; position:absolute; inset-inline:0; top:50%;
+        border-top:1px solid var(--line) }
+.rbar { position:absolute; inset-inline:0; width:56%; margin:0 auto }
+.rbar.up { bottom:50%; background:var(--green); color:var(--green); border-radius:5px 5px 0 0 }
+.rbar.dn { top:50%; background:var(--red); color:var(--red); border-radius:0 0 5px 5px }
+/* the running month is an estimate, and an estimate must not look like a fact */
+.rbar.prov { background:none; border:2px dashed }
+.rpct { font-size:.72rem; font-weight:700; margin-top:4px }
+.pos { color:var(--green); font-weight:600 } .neg { color:var(--red); font-weight:600 }
+
+/* ---- per-category trend cards ---- */
+.catgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:12px }
+.catcard { background:var(--card); border:1px solid var(--line); border-radius:var(--r2);
+        padding:var(--s3) var(--s4); cursor:pointer; transition:border-color .15s; box-shadow:var(--shadow) }
+.catcard:hover { border-color:var(--accent) }
+.cc-head { display:flex; justify-content:space-between; align-items:center; font-size:var(--t4); font-weight:600 }
+.badge { font-size:var(--t1); font-weight:600; padding:3px 10px; border-radius:var(--r1); white-space:nowrap }
+.badge.ok  { background:var(--pos-bg); color:var(--pos-ink) }
+.badge.mid { background:var(--warn-bg); color:var(--warn-ink) }
+.badge.bad { background:var(--neg-bg); color:var(--neg-ink) }
+.cc-chart { display:flex; gap:8px; align-items:flex-start; margin-top:12px }
+/* the month row lives inside the plot so it lines up with the bars automatically,
+   instead of being nudged by hand to clear the axis gutter */
+.cc-plot { flex:1; min-width:0; display:flex; flex-direction:column }
+.cc-axis { flex:none; height:68px; position:relative; display:flex; flex-direction:column;
+        justify-content:space-between; align-items:flex-end; font-size:.64rem;
+        color:var(--soft); white-space:nowrap; padding:1px 0 }
+/* the target reads as a third axis tick sitting exactly on the dashed line — in the
+   gutter, so unlike a label inside the plot it can never be hidden behind a bar */
+.cc-axis .tgt { position:absolute; inset-inline-end:0; transform:translateY(50%);
+        color:var(--ink); font-weight:600; background:var(--card); padding:0 2px }
+.cc-bars { height:68px; display:flex; gap:6px; align-items:flex-end; position:relative }
+.mb { flex:1; max-width:24px; margin:0 auto; border-radius:4px 4px 0 0; min-height:3px }
+.tline { position:absolute; inset-inline:0; border-top:2px dashed var(--ink);
+        opacity:.45; pointer-events:none }
+.cc-months { display:flex; gap:6px; margin-top:6px }
+.cc-months span { flex:1; text-align:center; font-size:.62rem; color:var(--soft);
+        overflow:hidden; white-space:nowrap }
+.cc-months span.now { color:var(--ink); font-weight:700 }
+.cc-now { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+        font-size:.82rem; color:var(--soft); margin-top:10px }
+.cc-now b { color:var(--ink); font-weight:600 }
+
+/* ---- tables ---- */
+table { width:100%; border-collapse:collapse; font-size:var(--t2) }
+th { text-align:start; color:var(--soft); font-weight:500; font-size:var(--t1); padding:var(--s2) 4px;
+     border-bottom:1px solid var(--line) }
+th.sortable { cursor:pointer; user-select:none; white-space:nowrap }
+th.sortable:hover { color:var(--ink) }
+th .arr { font-size:.6rem }
+td { padding:var(--s2) 4px; border-bottom:1px solid var(--line) }
+tr:last-child td { border-bottom:0 }
+.amt { font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; unicode-bidi:isolate; direction:ltr; text-align:end }
+.amt.in { color:var(--green) }
+/* money-direction filter: one row of segmented buttons above the table */
+.fseg { display:inline-flex; gap:6px; margin:0 0 10px }
+.fseg button { padding:7px 16px; border:1px solid var(--line); border-radius:20px;
+        background:var(--card); font:inherit; font-size:.85rem; cursor:pointer; color:var(--ink) }
+.fseg button:hover { background:var(--sel) }
+.fseg button.on { background:var(--ink); border-color:var(--ink); color:var(--bg); font-weight:700 }
+/* the card filter is a second .fseg row: .fseg is inline-flex, so two siblings would
+   share a line. wrap makes it its own block row and lets pills reflow instead of
+   overflowing once a household has several cards */
+.fseg.wrap { display:flex; flex-wrap:wrap }
+.catname { font-size:.82rem; color:var(--soft) }
+/* ---- data-source freshness: one compact row per account, not a stack of labels ---- */
+.srcgrid { display:flex; flex-direction:column; gap:1px; background:var(--line);
+        border-radius:var(--r1); overflow:hidden; border:1px solid var(--line) }
+.srcrow { display:flex; align-items:center; gap:var(--s3); background:var(--surface);
+        padding:var(--s3) var(--s4); font-size:var(--t2) }
+.srcname { display:flex; align-items:center; gap:var(--s2); font-weight:600;
+        font-size:var(--t3); flex:1; min-width:0 }
+.srcname i { width:9px; height:9px; border-radius:50%; flex:none }
+.srcrange { color:var(--ink-2) }
+.srccount { color:var(--ink-2); white-space:nowrap }
+.srccount b { color:var(--ink); font-weight:600 }
+.srcage { font-size:var(--t1); font-weight:700; padding:2px 9px; border-radius:9px; white-space:nowrap }
+.srcage.ok   { background:var(--pos-bg); color:var(--pos-ink) }
+.srcage.warn { background:var(--warn-bg); color:var(--warn-ink) }
+.srcage.old  { background:var(--neg-bg); color:var(--neg-ink) }
+@media (max-width:640px) { .srcrow { flex-wrap:wrap } .srcrange { order:3; width:100%; margin-inline-start:24px } }
+/* issuer badge: colored dot carries identity, text stays in the normal ink color */
+.iss { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:.82rem }
+.iss i { width:9px; height:9px; border-radius:50%; flex:none }
+input { width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:12px;
+        font:inherit; background:var(--card); color:var(--ink); margin-bottom:10px }
+.chip { display:none; margin:0 0 10px; padding:7px 14px; background:var(--sel); border:1px solid var(--accent);
+        border-radius:20px; font-size:.85rem; cursor:pointer }
+.chip.on { display:inline-block }
+
+/* ---- edit mode (only when served via python3 -m kaspion.serve) ---- */
+.addrow { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:8px }
+.addrow select, .addrow button { padding:10px 12px; border:1px solid var(--line); border-radius:12px;
+        font:inherit; background:var(--card); color:var(--ink) }
+.addrow button { background:var(--green); color:#fff; border:0; font-weight:700; cursor:pointer }
+.addrow button:disabled { opacity:.5 }
+button.del { border:0; background:none; cursor:pointer; font-size:.95rem; opacity:.45 }
+button.del:hover { opacity:1 }
+select.recat { padding:5px 8px; border:1px solid transparent; border-radius:9px;
+        font:inherit; font-size:.82rem; background:none; color:var(--ink); cursor:pointer }
+select.recat:hover, select.recat:focus { border-color:var(--line); background:var(--card) }
+input.budget-edit { width:5.2em; padding:3px 6px; margin:0; border:1px solid var(--line);
+        border-radius:8px; font:inherit; font-size:.82rem; text-align:center; background:var(--bg); color:var(--ink) }
+input.budget-edit:focus { outline:1.5px solid var(--accent); background:var(--card) }
+.uprow { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center }
+#catman .uprow { grid-template-columns:2fr 1fr auto }
+/* secondary tool, not a headline panel — smaller and flatter than the budget list above it */
+#catman { background:var(--surface-2); box-shadow:none; font-size:var(--t2) }
+/* add/upload are occasional actions, not the default view of the page — collapsed by default */
+.toolbar { margin-bottom:var(--s4) }
+.toolbar summary { cursor:pointer; padding:var(--s3) var(--s4); background:var(--surface-2);
+        border:1px solid var(--line); border-radius:var(--r1); font-weight:600; font-size:var(--t2);
+        color:var(--ink-2); list-style:none }
+.toolbar summary::-webkit-details-marker { display:none }
+.toolbar summary:hover { color:var(--ink) }
+.toolbar[open] summary { border-radius:var(--r1) var(--r1) 0 0; margin-bottom:var(--s3) }
+.ctag { display:inline-flex; align-items:center; gap:7px; background:var(--sel);
+        border:1px solid var(--accent); border-radius:20px; padding:5px 12px;
+        margin:0 0 6px 6px; font-size:.85rem }
+.ctag button { border:0; background:none; cursor:pointer; font-size:.9rem; opacity:.55; padding:0 }
+.ctag button:hover { opacity:1 }
+.uprow input[type=file] { padding:9px 12px; border:1px dashed var(--line); border-radius:12px;
+        font:inherit; font-size:.85rem; background:var(--bg); cursor:pointer }
+.uprow button { padding:10px 18px; border:0; border-radius:12px; background:var(--green);
+        color:#fff; font:inherit; font-weight:700; cursor:pointer }
+.uprow button:disabled { opacity:.5 }
+@media (max-width:760px) { .addrow { grid-template-columns:1fr 1fr } .uprow { grid-template-columns:1fr } }
+
+/* ---- dialogs (add-account, sync) — shared chrome ---- */
+dialog { border:1px solid var(--line); border-radius:var(--r2); background:var(--surface);
+        color:var(--ink); box-shadow:var(--shadow); padding:var(--s4);
+        /* centered, with a FIXED height (not max-height/fit-content): a box that
+           resizes to its content recomputes its centered position every time its
+           content's height changes — this shifted the add-account picker out from
+           under the pointer between clicks before it was fixed. A constant box size
+           keeps the center stable; overflow scrolls inside it. */
+        position:fixed; inset:0; margin:auto; overflow-y:auto }
+dialog::backdrop { background:rgba(0,0,0,.45) }
+dialog h3 { margin:0 0 var(--s2) }
+dialog form { text-align:end; margin:0 }
+dialog .x { border:0; background:none; color:var(--ink-2); font-size:1.1rem; cursor:pointer; padding:2px 4px }
+dialog .x:hover { color:var(--ink) }
+
+dialog#acctdlg { width:min(480px, 92vw); height:min(80vh, 620px) }
+#acct-select { display:block; width:100%; box-sizing:border-box; margin:0 0 8px;
+        padding:10px 12px; border:1px solid var(--line); border-radius:12px;
+        font:inherit; background:var(--card); color:var(--ink); cursor:pointer }
+#acct-select:focus { outline:1.5px solid var(--accent) }
+#acct-form input.acct-f, #acct-form input.acct-meta { display:block; width:100%;
+        box-sizing:border-box; margin:0 0 8px; padding:10px 12px; border:1px solid var(--line);
+        border-radius:12px; font:inherit; background:var(--bg); color:var(--ink) }
+#acct-form input.acct-f:focus, #acct-form input.acct-meta:focus { outline:1.5px solid var(--accent) }
+#acct-form #acct-go { width:100%; padding:11px; border:0; border-radius:12px; background:var(--green);
+        color:#fff; font:inherit; font-weight:700; cursor:pointer }
+#acct-form #acct-go:disabled { opacity:.5 }
+
+/* ---- sync dialog: a spinner that resolves into a green ✓ or red ✗, plus the same
+   live per-institution log the sidebar used to show in a cramped, easy-to-miss spot */
+dialog#syncdlg { width:min(340px, 90vw); height:min(46vh, 300px); text-align:center }
+.sync-icon { width:48px; height:48px; margin:6px auto 4px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        font-size:1.3rem; font-weight:700; color:#fff }
+.sync-icon.spin { border:4px solid var(--line); border-top-color:var(--accent);
+        animation:sync-spin .9s linear infinite }
+.sync-icon.ok { background:var(--pos) }
+.sync-icon.err { background:var(--neg) }
+@keyframes sync-spin { to { transform:rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .sync-icon.spin { animation:none } }
+#sync-log { max-height:170px; overflow-y:auto; margin-top:10px; font-size:.82rem;
+        line-height:1.8; color:var(--ink-2) }
+.syncline.ok { color:var(--pos-ink) }
+.syncline.err { color:var(--neg-ink) }
+
+@media (max-width:760px) {
+  body { padding:18px 14px 86px }
+  #side { top:auto; bottom:0; inset-inline:0; width:auto; height:64px; flex-direction:row; align-items:center;
+          justify-content:space-around; padding:0; border-inline-end:0; border-top:1px solid var(--line); z-index:9 }
+  #side .logo, #side .tag, #side .foot, #syncbtn, #addacct, #themebtn { display:none }
+  #side nav { flex-direction:row; gap:0; width:100%; justify-content:space-around }
+  #side nav a { flex-direction:column; gap:2px; padding:8px 10px; font-size:.68rem }
+  .cards { grid-template-columns:1fr 1fr } .card:first-child { grid-column:1/-1 }
+  .split { grid-template-columns:1fr }
+}

@@ -10,11 +10,14 @@ It is not, and must never become, a hosted service.
 - **Local-only.** The dashboard is a static file; the optional edit server
   (`python3 -m kaspion.serve`) and the future MCP server bind to `127.0.0.1` only.
   Nothing listens on the LAN or internet.
-- **Data at rest.** `data/finance.duckdb` and the encryption key live only in `data/`,
-  which is gitignored. Back up by copying the file.
+- **Data at rest.** `finance.duckdb` and the encryption key live in the OS's per-user
+  data directory (`kaspion/paths.py`), never inside the app's own folder. Back up by
+  copying the file.
 - **Credentials.** Bank credentials are encrypted with AES-256-GCM
-  (`kaspion/ingest/crypto.py`). The key file has 0600 permissions. Credentials are
-  passed to the Node scraper via environment variables — never argv, never logged.
+  (`kaspion/ingest/crypto.py`). The key file gets 0600 permissions on macOS/Linux; on
+  Windows, which has no POSIX permission bits, it relies on the user profile's own ACL
+  instead. Credentials are passed to the Node scraper via environment variables — never
+  argv, never logged.
 - **Outbound traffic.** Exactly two possible destinations:
   1. your bank/card issuer (scraping, over TLS via israeli-bank-scrapers);
   2. the Anthropic API — only if `KASPION_AI_PROVIDER=claude` is explicitly set,

@@ -32,16 +32,26 @@ def valid_categories() -> list[str]:
     return VALID_CATEGORIES + [c for c in extra if c not in VALID_CATEGORIES]
 
 PROMPT = """You categorize Israeli household transactions. Merchants may be Hebrew or English.
-Return ONLY a JSON object. Keys: EXACTLY the merchant strings given below, unchanged.
-Values: exactly one category id from this list:
+Return ONLY a JSON array of category ids, one per merchant below, in the SAME ORDER.
+Do not repeat the merchant names — many contain quotes/brackets that break JSON when echoed
+back, so the array position is what maps each answer to its merchant, not the text.
+Each value must be exactly one category id from this list:
 {categories}
 
-Examples of correct output:
-{{"רמי לוי": "groceries", "וולט": "restaurants", "netflix.com": "subscriptions", "חברת החשמל": "housing", "סופר פארם": "health", "רב קו": "transport", "gett": "transport", "ארנונה חולון": "housing", "שכר דירה": "housing"}}
+Example: for merchants ["רמי לוי", "netflix.com", "חברת החשמל"], return exactly:
+["groceries", "subscriptions", "housing"]
 
-Merchants:
+Merchants ({n}):
 {merchants}
 """
+
+
+def _build_prompt(merchants: list[str]) -> str:
+    return PROMPT.format(
+        categories=", ".join(valid_categories()),
+        n=len(merchants),
+        merchants="\n".join(f"{i + 1}. {m}" for i, m in enumerate(merchants)),
+    )
 
 
 class Provider(Protocol):
@@ -66,15 +76,21 @@ class OllamaProvider:
         self.host = host or os.environ.get("KASPION_OLLAMA_HOST", "http://127.0.0.1:11434")
 
     def categorize(self, merchants: list[str]) -> dict[str, str]:
-        prompt = PROMPT.format(
-            categories=", ".join(valid_categories()), merchants="\n".join(merchants)
-        )
+        # a full JSON-schema format (not just "json") makes Ollama constrain decoding to
+        # an array of exactly len(merchants) valid category ids — the earlier free-form
+        # "json" mode let the model wander into an unrelated object shape.
+        schema = {
+            "type": "array",
+            "items": {"type": "string", "enum": valid_categories()},
+            "minItems": len(merchants),
+            "maxItems": len(merchants),
+        }
         resp = requests.post(
             f"{self.host}/api/chat",
             json={
                 "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "format": "json",
+                "messages": [{"role": "user", "content": _build_prompt(merchants)}],
+                "format": schema,
                 "stream": False,
                 "options": {"temperature": 0},
             },
@@ -96,16 +112,13 @@ class ClaudeProvider:
         import anthropic
 
         client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
-        prompt = PROMPT.format(
-            categories=", ".join(valid_categories()), merchants="\n".join(merchants)
-        )
         msg = client.messages.create(
             model=self.model,
             max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": _build_prompt(merchants)}],
         )
         text = msg.content[0].text
-        text = text[text.index("{") : text.rindex("}") + 1]  # tolerate prose around JSON
+        text = text[text.index("[") : text.rindex("]") + 1]  # tolerate prose around JSON
         return _clean(json.loads(text), merchants)
 
 
@@ -119,12 +132,18 @@ class NoneProvider:
         return {}
 
 
-def _clean(raw: dict[str, str], merchants: list[str]) -> dict[str, str]:
-    """Keep only known merchants mapped to valid categories."""
+def _clean(categories: list[str], merchants: list[str]) -> dict[str, str]:
+    """Zip positionally with merchants. A length mismatch means the model dropped or
+    added an entry — positions would no longer line up, so the whole batch is discarded
+    rather than risk silently pairing a category with the wrong merchant."""
+    if not isinstance(categories, list) or len(categories) != len(merchants):
+        return {}
     allowed = set(valid_categories())
-    return {m: raw[m] for m in merchants if raw.get(m) in allowed}
+    return {m: c for m, c in zip(merchants, categories, strict=True) if c in allowed}
 
 
 def get_provider() -> Provider:
-    choice = os.environ.get("KASPION_AI_PROVIDER", "ollama")
+    # "none" by default: no model download, works on any machine. Ollama/Claude stay
+    # fully available, opt-in via KASPION_AI_PROVIDER or --provider.
+    choice = os.environ.get("KASPION_AI_PROVIDER", "none")
     return {"ollama": OllamaProvider, "claude": ClaudeProvider, "none": NoneProvider}[choice]()

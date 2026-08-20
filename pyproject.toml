@@ -1,31 +1,46 @@
 [project]
 name = "kaspion"
 version = "0.1.0"
-description = "Local-only, privacy-first household finance pipeline: DuckDB + dbt + AI categorization + Evidence dashboard"
-requires-python = ">=3.10"
+description = "Local-only, privacy-first household finance pipeline: DuckDB + dbt + AI categorization + self-contained HTML dashboard"
+# Upper bound is deliberate and load-bearing. dbt-core declares only ">=3.10", but it
+# fails on 3.14 ("UnserializableField: Field 'schema' ... is not serializable" out of
+# mashumaro) — so the resolver cannot protect us and we pin the ceiling here. Without
+# it a fresh `uv sync` picks the newest Python available and every install is broken,
+# which a developer on 3.11 never sees. Raise only after testing dbt on the new version.
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "duckdb>=1.1",
     "dbt-duckdb>=1.9",
     "requests>=2.32",
     "cryptography>=43.0",
-    "pandas>=2.2",
     # reading bank/card statement exports uploaded from the dashboard:
     # openpyxl for .xlsx (Isracard), xlrd for legacy OLE2 .xls (ONE ZERO)
     "openpyxl>=3.1",
     "xlrd>=2.0",
+    # ships Node as a Python dependency so end users never install it separately —
+    # scraper/package.json's israeli-bank-scrapers requires Node >= 22.22.2
+    "nodejs-wheel>=22.22",
 ]
 
 [project.optional-dependencies]
 claude = ["anthropic>=0.40"]
-trackb = ["mcp>=1.2", "langgraph>=0.2", "pyyaml>=6.0"]
 dev = ["ruff>=0.8", "pytest>=8.0"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "N", "BLE"]
+# This app is written in Hebrew. RUF001/RUF002 flag Hebrew punctuation and RTL marks as
+# "ambiguous unicode" in every user-facing string — false positives, not real ambiguity.
+ignore = ["RUF001", "RUF002"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["kaspion", "kaspion.ingest", "kaspion.ai", "kaspion.semantic", "kaspion.mcp", "kaspion.agent"]
+packages = ["kaspion", "kaspion.ingest", "kaspion.ai"]
+
+[tool.setuptools.package-data]
+kaspion = ["assets/*"]
