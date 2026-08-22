@@ -32,6 +32,28 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 | **What it does** | Saves every transaction once (duplicates are detected and skipped, so re-running is always safe). Also holds your corrections and budgets. |
 | **Why** | One private file = easy to back up (`cp`), impossible to leak. Like a tiny personal Snowflake. |
 
+### How a duplicate is recognised
+
+`kaspion.db.assign_natural_ids` treats **content** — `(account_id, posted_date, amount,
+raw_description)` — as the identity of a transaction, and lets it override any reference
+number the bank or scraper supplied. Within one batch only the first row with a given
+content key is kept; a row whose content already exists in the database is dropped
+rather than given a new id.
+
+That rule was chosen after finding 9 real duplicate groups across every institution in
+one household's data, from two separate causes:
+
+- A single fetch listing the same movement twice — most likely a pending and a settled
+  copy that share no common reference number.
+- The older id scheme, which mixed in a row's *position* within its batch. That position
+  is not stable between runs, so the same real transaction could mint a second id later
+  and be inserted again.
+
+Neither has a signal that distinguishes it from two genuinely separate transactions on
+the same day, for the same amount, with the same description. That coincidence is rare,
+and over-counting real money is worse than under-counting a rare duplicate purchase — so
+collapsing to one row is the safer default for a finance app.
+
 ## Step 3 — Clean & model
 
 | | |

@@ -75,7 +75,11 @@ def next_connection_id(creds: dict, company: str) -> str:
 
 
 def remove_credentials(conn_id: str) -> None:
-    creds = load_credentials() if CRED_FILE.exists() else {}
+    # nothing saved = nothing to remove. Falling through would mint a key and write an
+    # encrypted empty file for an install that has never connected an account.
+    if not CRED_FILE.exists():
+        return
+    creds = load_credentials()
     creds.pop(conn_id, None)
     save_credentials(creds)
 

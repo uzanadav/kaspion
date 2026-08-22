@@ -33,7 +33,17 @@ for (const account of result.accounts) {
       // israeli-bank-scrapers: chargedAmount is negative for charges.
       // VERIFY the sign convention per institution after the first real scrape;
       // if a source reports charges as positive, negate HERE, never downstream.
-      amount: txn.chargedAmount,
+      //
+      // A purchase the card company has not booked yet (Max's "עסקאות שטרם נקלטו")
+      // arrives with chargedAmount 0 and the real figure in originalAmount — taking
+      // the 0 put a ₪0 row on the dashboard for a real 160₪ swim. Only when the
+      // original is in shekels: a foreign originalAmount is not the shekel charge,
+      // and a wrong number is worse than a visible zero.
+      // An ABSENT currency is not a promise of shekels, so it falls through to the 0
+      // as well: a visible zero is honest, a foreign figure printed as ₪ is not.
+      amount: (txn.chargedAmount === 0 && txn.originalAmount
+               && ["ILS", "₪"].includes(txn.originalCurrency)
+               ? txn.originalAmount : txn.chargedAmount),
       // chargedAmount is always in the account's own currency (ILS for Israeli cards),
       // even when the underlying purchase was foreign — never tag it with originalCurrency,
       // that describes txn.originalAmount (unused here), not chargedAmount.

@@ -11,6 +11,9 @@
   --pos-bg:#e7f6ee; --pos-ink:#116646; --warn-bg:#fdf3e0; --warn-ink:#8a5a00;
   --neg-bg:#fdebec; --neg-ink:#a12b30;
   --shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  /* brand silver, light→shadow. Darker on the cream light theme, where the bright
+     silver of the dark theme washes out into the background. */
+  --sil-1:#eceef3; --sil-2:#98a0b0; --sil-3:#5a6070;
   /* aliases kept so existing rules keep working during migration */
   --green:var(--pos); --red:var(--neg); --gray:var(--ink-3);
   --soft:var(--ink-2); --card:var(--surface); --sel:var(--surface-2);
@@ -25,6 +28,7 @@
     --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
     --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+    --sil-1:#fbfbfd; --sil-2:#c7cad3; --sil-3:#8b8f9c;
   }
 }
 /* explicit toggle wins in BOTH directions */
@@ -37,6 +41,7 @@
   --warn-bg:rgba(166,124,26,.22); --warn-ink:#e3b859;
   --neg-bg:rgba(224,74,72,.18); --neg-ink:#f28684;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.3);
+  --sil-1:#fbfbfd; --sil-2:#c7cad3; --sil-3:#8b8f9c;
 }
 :root[data-theme="light"] { color-scheme: light }
 * { box-sizing:border-box; margin:0 }
@@ -57,6 +62,9 @@ body { font-family:-apple-system, "Segoe UI", "Heebo", Arial, sans-serif;
    regardless of RTL (the sidebar already owns the right rail) ---- */
 .brand-mark { position:fixed; top:28px; left:28px; z-index:5;
         filter:drop-shadow(0 1px 3px rgba(0,0,0,.25)) }
+/* the wordmark makes the mark wide enough to collide with content on a phone, where the
+   sidebar has already become a bottom bar — shrink it rather than drop the brand */
+@media (max-width:760px) { .brand-mark { top:14px; left:14px } .brand-mark svg { width:134px; height:40px } }
 
 /* ---- sidebar (right rail, RTL-natural; bottom bar on mobile) ---- */
 #side { position:fixed; inset-inline-start:0; top:0; bottom:0; width:224px; background:var(--card);
@@ -159,17 +167,45 @@ h2 { font-size:1.05rem; margin:26px 0 12px }
 .leg .dot { width:11px; height:11px; border-radius:4px; flex:none }
 .leg .nm { flex:1 } .leg .am { font-weight:600 }
 
-/* ---- categories view ---- */
-.cat { margin-bottom:var(--s1); padding:var(--s3); border-radius:var(--r1); cursor:pointer; transition:background .15s }
+/* ---- categories view: budget vs actual, as bullet rows ---- */
+.cat { padding:var(--s2) var(--s3); border-radius:var(--r1); cursor:pointer; transition:background .15s }
 .cat:hover { background:var(--bg) }
-.cat-line { display:flex; justify-content:space-between; font-size:var(--t3); margin-bottom:5px }
-.cat-amt small { color:var(--soft); font-weight:400 }
+.cat-line { display:flex; align-items:center; gap:var(--s3); margin-bottom:8px }
+/* the name is the row's label and gets the space; everything else is sized to content */
+.cat-name { font-size:var(--t3); font-weight:600; flex:1; min-width:0;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* the figure the eye should land on. .num already isolates it as an LTR run */
+.cat-actual { font-size:var(--t3); font-weight:700 }
+.cat-pct { font-size:var(--t1); color:var(--soft); font-variant-numeric:tabular-nums }
+/* the budget reads as text until you touch it — an input box mid-sentence was noise */
+.cat-budget { display:inline-flex; align-items:center; gap:3px; color:var(--soft); font-size:var(--t2) }
+.budget-edit { width:64px; padding:3px 6px; border-radius:8px; border:1px solid transparent;
+        background:none; color:var(--soft); font:inherit; font-size:var(--t2);
+        text-align:end; direction:ltr; cursor:text }
+.budget-edit:hover { border-color:var(--line); background:var(--card) }
+.budget-edit:focus { border-color:var(--accent); background:var(--card); color:var(--ink); outline:none }
+.budget-edit::-webkit-outer-spin-button, .budget-edit::-webkit-inner-spin-button {
+        -webkit-appearance:none; margin:0 }
 .sugg-tag { font-size:.62rem; font-weight:600; color:var(--warn-ink); background:var(--warn-bg);
-        padding:1px 7px; border-radius:8px; margin-inline-start:6px; cursor:help }
-/* progress fill anchors to the RIGHT and grows leftward (natural for Hebrew) */
-.bar { height:9px; background:var(--line); border-radius:6px; overflow:hidden;
-       display:flex; justify-content:flex-start }
-.fill { height:100%; border-radius:6px }
+        padding:1px 7px; border-radius:8px; cursor:help }
+
+/* Bullet track. The budget sits at a FIXED percentage on every row, so the target line
+   is a straight column down the page and an over-budget row visibly runs PAST it. The
+   old bar clamped to 100%, which drew "347% of budget" and "99% of budget" identically —
+   the bar carried no information for exactly the rows that matter most. */
+.bullet { position:relative; height:8px }
+.bullet .track { height:100%; background:var(--line); border-radius:5px; overflow:hidden;
+        display:flex; justify-content:flex-start }
+.bullet i { height:100%; display:block }
+.bullet .b-in { background:var(--pos) }
+/* 2px surface gap so the two segments read as two, not one smeared bar */
+.bullet .b-in.split { border-inline-end:2px solid var(--card) }
+.bullet .b-over { background:var(--neg) }
+.cat:hover .bullet .b-in.split { border-inline-end-color:var(--bg) }
+/* the target tick overhangs the track, so it stays visible on top of a full fill */
+.bullet .tick { position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px;
+        background:var(--ink-3) }
+.badge.none { background:var(--surface-2); color:var(--ink-2) }
 
 /* ---- trends: income vs spend ---- */
 /* Real pixels, not a scaled viewBox: a viewBox that stretches to its container scales the
@@ -387,9 +423,24 @@ dialog#acctdlg { width:min(480px, 92vw); height:min(80vh, 620px) }
         color:#fff; font:inherit; font-weight:700; cursor:pointer }
 #acct-form #acct-go:disabled { opacity:.5 }
 
+/* the technical tail of a failed sync, folded away by default */
+#sync-log .det { text-align:start; margin-top:8px }
+#sync-log .det summary { cursor:pointer; color:var(--ink-2); font-size:.85rem }
+#sync-log .det pre { direction:ltr; text-align:left; white-space:pre-wrap; margin:6px 0 0;
+                     font-size:.72rem; color:var(--ink-2); max-height:150px; overflow:auto }
+
+/* ---- "kaspion isn't running" dialog: one button instead of a terminal command ---- */
+dialog#downdlg { width:min(360px, 92vw); text-align:center }
+#downgo { margin:var(--s2) 0 var(--s1); padding:12px 22px; border:0; border-radius:12px;
+          background:var(--green); color:#fff; font:inherit; font-weight:700; cursor:pointer }
+#downgo:disabled { opacity:.55; cursor:wait }
+
 /* ---- sync dialog: a spinner that resolves into a green ✓ or red ✗, plus the same
    live per-institution log the sidebar used to show in a cramped, easy-to-miss spot */
-dialog#syncdlg { width:min(340px, 90vw); height:min(46vh, 300px); text-align:center }
+/* min-height keeps the spinner state as calm as it was; max-height lets the box grow
+   instead of burying a failure's details in a 170px scroll trap */
+dialog#syncdlg { width:min(340px, 90vw); min-height:min(46vh, 300px);
+        max-height:min(84vh, 620px); text-align:center }
 .sync-icon { width:48px; height:48px; margin:6px auto 4px; border-radius:50%;
         display:flex; align-items:center; justify-content:center;
         font-size:1.3rem; font-weight:700; color:#fff }
@@ -399,7 +450,7 @@ dialog#syncdlg { width:min(340px, 90vw); height:min(46vh, 300px); text-align:cen
 .sync-icon.err { background:var(--neg) }
 @keyframes sync-spin { to { transform:rotate(360deg) } }
 @media (prefers-reduced-motion: reduce) { .sync-icon.spin { animation:none } }
-#sync-log { max-height:170px; overflow-y:auto; margin-top:10px; font-size:.82rem;
+#sync-log { max-height:min(52vh, 380px); overflow-y:auto; margin-top:10px; font-size:.82rem;
         line-height:1.8; color:var(--ink-2) }
 .syncline.ok { color:var(--pos-ink) }
 .syncline.err { color:var(--neg-ink) }

@@ -84,7 +84,13 @@ def _scrape_company(company: str, cfg: dict, days_back: int) -> list[dict]:
                 # shared per-user cache, so puppeteer has to be told where to look at
                 # RUN time too — without this it hunts the default cache, finds nothing,
                 # and every scrape fails with a missing-browser error.
-                PUPPETEER_CACHE_DIR=str(PUPPETEER_CACHE),
+                #
+                # Only when that vendored copy actually exists: an install predating it
+                # (or a developer checkout) keeps its browser in puppeteer's default
+                # cache, and forcing a directory that isn't there made EVERY bank fail
+                # with an unexplained UNKNOWN.
+                **({"PUPPETEER_CACHE_DIR": str(PUPPETEER_CACHE)}
+                   if PUPPETEER_CACHE.exists() else {}),
             ),
             capture_output=True,
             text=True,
@@ -112,6 +118,21 @@ def _scrape_company(company: str, cfg: dict, days_back: int) -> list[dict]:
 
 def _ingest(rows: list[dict]) -> int:
     con = connect()
+    # Drop this batch's accounts' zero-amount placeholders first. A pending purchase can
+    # still reach us as 0 (a foreign-currency one, or an institution that reports neither
+    # figure), and INSERT ... DO NOTHING never revisits a row: once the charge settles
+    # under the same id, that zero would stay on the dashboard forever.
+    #
+    # Only within the window this batch covers — a zero older than that will not be
+    # re-fetched, and deleting it would silently lose the one trace of the purchase.
+    # A row worth 0 affects no total, so re-fetching the recent ones costs nothing.
+    accounts = {r["account_id"] for r in rows}
+    if accounts:
+        oldest = min(r["posted_date"] for r in rows)
+        con.execute(
+            "DELETE FROM raw.transactions WHERE amount = 0 AND posted_date >= ? "
+            f"AND account_id IN ({','.join('?' * len(accounts))})",
+            [oldest, *accounts])
     rows = _assign_ids(rows, con)
     before = con.execute("SELECT count(*) FROM raw.transactions").fetchone()[0]
     if rows:
@@ -193,11 +214,14 @@ def add_institution(company: str, credentials: dict, account_type: str, label: s
     first. Raises ScrapeError on a bad login — nothing is written to disk in that case.
     """
     cfg = {"type": account_type, "credentials": credentials, "label": label}
-    _scrape_company(company, cfg, days_back=7)  # probe — raises on bad login, no side effect
+    # ONE scrape, not a short probe followed by a real one: the full fetch already raises
+    # on a bad login, so a separate probe bought nothing and cost a second full browser
+    # login (up to SCRAPE_TIMEOUT again) plus a second failed-login attempt against banks
+    # that lock an account after three.
+    rows = _scrape_company(company, cfg, days_back=90)
     creds = load_credentials() if CRED_FILE.exists() else {}
     creds[next_connection_id(creds, company)] = cfg  # merge, never wipe the rest of the file
     save_credentials(creds)
-    rows = _scrape_company(company, cfg, days_back=90)
     return _ingest(rows)
 
 

@@ -90,9 +90,12 @@ one.** The **➕ הוספת חשבון** button in the sidebar (`app.js: renderA
 (`#acct-select`, three `<optgroup>`s: banks, cards, blocked) listing every institution in
 `crypto.COMPANY_FIELDS` (17, copied verbatim from `israeli-bank-scrapers`' own
 `SCRAPERS` export — see `tests/test_company_fields.py`), posts to `/api/add-account`,
-which calls `scraper_loader.add_institution()`: **verify the login with a short probe
-scrape before writing anything to disk**, only then merge it into
-`credentials.json.enc` and pull 90 days. `isracard`/`amex`/`oneZero` sit in their own
+which calls `scraper_loader.add_institution()`: **the 90-day scrape runs BEFORE anything
+is written to disk**, so a bad login raises with nothing saved; only then are the
+credentials merged into `credentials.json.enc` and the rows ingested. (It used to run a
+short 7-day probe first and then scrape again — dropped because the full fetch already
+raises on a bad login, so the probe bought nothing and cost a second browser login plus
+a second failed-login attempt against banks that lock an account after three.) `isracard`/`amex`/`oneZero` sit in their own
 disabled `<optgroup>` (`"blocked": "recaptcha"` for the first two, `"2fa"` for
 oneZero — its login needs interactive OTP enrollment a one-shot form can't do), unpickable
 client-side **and** rejected server-side if the client check is ever bypassed (`serve.py`
@@ -197,8 +200,9 @@ no longer wastes a browser session failing on it.
    string, argv, or a log line (`Handler.log_message` is a permanent no-op). `company`
    is checked against `COMPANY_FIELDS` before anything else runs, and only the field
    names that institution's entry lists are ever read out of the payload — extra keys in
-   the request are silently dropped, not stored. `add_institution()` **probes the login
-   before calling `save_credentials()`**, and merges into the existing file
+   the request are silently dropped, not stored. `add_institution()` **completes its
+   scrape before calling `save_credentials()`** — a bad login raises with nothing on
+   disk; do not reorder those two, whatever else changes — and merges into the existing file
    (`load_credentials() | {company: cfg}`) — it must never overwrite the other saved
    institutions. Every error response carries `error_type`/a message from the scraper's
    own `{error, message}` JSON, never the credential values that were sent.
@@ -262,7 +266,10 @@ different question. Do not merge them.
 - **A failed `/api/*` call used to report into a hidden div.** `#a-msg` lives inside the
   collapsed "➕ הוספת הוצאה" toolbar, so a failed delete/recategorize/budget-edit looked
   like nothing happened. `api()` now also writes to a fixed `#toast`. Most common real
-  cause: the page was opened as a plain file, or `kaspion.serve` isn't running.
+  cause: the page was opened as a plain file, or `kaspion.serve` isn't running — that
+  case now opens the "כספיון לא פועל" dialog instead, whose button opens `kaspion://`,
+  a scheme the launchers register (`Kaspion.app` on macOS, `HKCU\Software\Classes` on
+  Windows) so a non-technical user never needs a terminal to bring the server up.
 - **`fill="none"` receives no pointer events** in SVG — that is why the old `.tinc`
   tooltip never fired. Hit rects need `fill="transparent"` **and** `pointer-events:all`.
 - **`serve.py` uses `ThreadingHTTPServer`, not `HTTPServer` — this was a real hang, not a

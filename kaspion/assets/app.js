@@ -156,15 +156,45 @@ function applyView() {
 }
 
 /* ---------- editing (one version for everyone; talks to the local server) ---------- */
-const API = location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8765';
-// shown whenever a fetch to the local server fails to even connect (not a server-side
-// error — the server process itself isn't up). One source of truth so the wording only
-// needs to be right in one place.
-const SERVER_DOWN_MSG = 'השרת המקומי כבוי — הוא נדרש כדי לסנכרן ולשמור שינויים. ' +
-  'פתחו טרמינל בתיקיית kaspion והריצו: python3 -m kaspion.serve — ואז נסו שוב (אין צורך לרענן את הדף).';
+const SERVER_URL = 'http://127.0.0.1:8765';
+const API = location.protocol.startsWith('http') ? '' : SERVER_URL;
+// last resort, shown only if the one-click start below never brings the server up
+const SERVER_DOWN_MSG = 'לא הצלחנו להפעיל את כספיון מכאן. ' +
+  'לחצו פעמיים על הקובץ kaspion בתיקיית ההתקנה, ואז נסו שוב.';
+const isDown = e => e.message.includes('fetch');   // failed to connect at all
+
+// A page cannot start a process, but it can open a URL: the launcher registers a
+// kaspion:// handler (Kaspion.app on macOS, HKCU\Software\Classes on Windows) that runs
+// the launcher, so "kaspion isn't running" is one button instead of a terminal command.
+function showServerDown() {
+  $('down-msg').textContent = '';
+  $('downgo').disabled = false;
+  if (!$('downdlg').open) $('downdlg').showModal();
+}
+$('downgo').onclick = () => {
+  $('downgo').disabled = true;
+  $('down-msg').textContent = 'מפעילים… (אם נפתחת שאלה של הדפדפן, אשרו אותה)';
+  location.href = 'kaspion://start';
+  let tries = 0;
+  const t = setInterval(async () => {
+    try {
+      await fetch(API + '/api/sync-status');   // any answer at all means it's up
+      clearInterval(t);
+      location.href = SERVER_URL;              // land on the served page, edit mode on
+    } catch (e) {
+      // ~60s: a cold start builds the report before it binds the port
+      if (++tries > 60) {
+        clearInterval(t);
+        $('downgo').disabled = false;
+        $('down-msg').textContent = SERVER_DOWN_MSG;
+      }
+    }
+  }, 1000);
+};
 {
   const sel = $('a-cat');
-  sel.innerHTML = DATA.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML = DATA.categories.map(c =>
+    `<option value="${escAttr(c.id)}">${escTxt(c.name)}</option>`).join('');
   sel.value = 'other';
   $('a-date').value = new Date().toISOString().slice(0, 10);
   $('a-go').onclick = async () => {
@@ -193,7 +223,9 @@ async function api(path, payload, msgId = 'a-msg', busy = 'שומר…') {
                                              : (j.error || 'failed'));
     location.reload();
   } catch (e) {
-    const msg = e.message.includes('fetch') ? SERVER_DOWN_MSG : 'שגיאה: ' + e.message;
+    document.querySelectorAll('button').forEach(b => b.disabled = false);
+    if (isDown(e)) { $(msgId).textContent = ''; showServerDown(); return; }
+    const msg = 'שגיאה: ' + e.message;
     $(msgId).textContent = msg;
     // msgId's own text is enough when the caller's form is on screen (add-transaction,
     // add-category); everything else — deleting a row, recategorizing, editing a budget —
@@ -201,7 +233,6 @@ async function api(path, payload, msgId = 'a-msg', busy = 'שומר…') {
     // hidden inside a collapsed panel or a scrolled-past section
     $('toast').textContent = msg + ' · לסגירה, לחצו כאן';
     $('toast').className = 'toast on';
-    document.querySelectorAll('button').forEach(b => b.disabled = false);
   }
 }
 
@@ -240,18 +271,22 @@ $('syncbtn').onclick = async () => {
   try {
     const r = await fetch(API + '/api/sync', { method: 'POST', body: '{}' });
     const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'failed');
+    if (!j.ok) { const err = new Error(j.error || 'failed'); err.detail = j.detail; throw err; }
     clearInterval(poll);
     $('sync-icon').className = 'sync-icon ok';
     $('sync-icon').textContent = '✓';
     setTimeout(() => location.reload(), 700); // let the green confirmation register first
   } catch (e) {
     clearInterval(poll);
-    const msg = e.message.includes('fetch') ? SERVER_DOWN_MSG : 'שגיאה: ' + e.message;
+    document.querySelectorAll('button').forEach(b => b.disabled = false);
+    if (isDown(e)) { $('syncdlg').close(); showServerDown(); return; }
     $('sync-icon').className = 'sync-icon err';
     $('sync-icon').textContent = '✗';
-    $('sync-log').innerHTML += `<div class="syncline err">${escTxt(msg)}</div>`;
-    document.querySelectorAll('button').forEach(b => b.disabled = false);
+    // the raw output (a Python traceback, usually) is real information for whoever
+    // has to fix it and noise for everyone else — collapsed, never the headline
+    $('sync-log').innerHTML += `<div class="syncline err">${escTxt(e.message)}</div>` +
+      (e.detail ? `<details class="det"><summary>פרטים טכניים</summary>` +
+                  `<pre>${escTxt(e.detail)}</pre></details>` : '');
   }
 };
 
@@ -260,7 +295,7 @@ function renderCatManager() {
   const custom = DATA.categories.filter(c => c.custom);
   $('nc-list').innerHTML = custom.length
     ? `<div class="hint" style="margin-bottom:6px">קטגוריות שהוספתם:</div>` + custom.map(c =>
-        `<span class="ctag">${c.name}
+        `<span class="ctag">${escTxt(c.name)}
            <button class="ncdel" data-id="${escAttr(c.id)}" data-name="${escAttr(c.name)}"
                    title="מחיקת הקטגוריה">✕</button></span>`).join('')
     : '<div class="hint">עדיין לא הוספתם קטגוריות משלכם</div>';
@@ -578,9 +613,9 @@ function renderOverview(m) {
   $('donut').innerHTML = svg || '';
   $('donut-total').textContent = ils(m.spent);
   $('legend').innerHTML = parts.map((p, i) =>
-    `<div class="leg" data-cat="${p.name}">
+    `<div class="leg" data-cat="${escAttr(p.name)}">
        <span class="dot" style="background:${pal[i % pal.length]}"></span>
-       <span class="nm">${p.name}</span><span class="am">${ils(p.v)}</span>
+       <span class="nm">${escTxt(p.name)}</span><span class="am">${ils(p.v)}</span>
        <span class="hint">${Math.round(p.v / total * 100)}%</span></div>`).join('')
     || '<div class="hint">אין עדיין הוצאות החודש 🎉</div>';
   document.querySelectorAll('.leg').forEach(el => el.onclick = () => gotoCat(el.dataset.cat));
@@ -590,24 +625,55 @@ function renderOverview(m) {
   // negative row filed under 'income' (a PAYBOX reversal, a card fee) — it is not an
   // expense either, and fct_budget_pacing already leaves it out of the ₪ total above this.
   $('top5').tBodies[0].innerHTML = [...m.txns].filter(isSpend).sort((a, b) => b[4] - a[4]).slice(0, 5)
-    .map(t => `<tr><td class="num">${t[1]}</td><td>${t[2]}</td><td>${t[3]}</td><td class="amt nums">${ils(t[4])}</td></tr>`)
+    .map(t => `<tr><td class="num">${t[1]}</td><td>${escTxt(t[2])}</td><td>${escTxt(t[3])}</td>
+       <td class="amt nums">${ils(t[4])}</td></tr>`)
     .join('') || '<tr><td colspan="4" class="hint">אין תנועות</td></tr>';
 }
 
+// Where the budget sits on every bullet track, as a % of its width. Fixed rather than
+// per-row so the target lines form one straight column, and the space beyond it is the
+// headroom an over-budget row spills into.
+const BUDGET_MARK = 72;
+
 function renderCats(m) {
   $('cats').innerHTML = m.cats.map(c => {
-    const pct = c.budget ? Math.min(c.actual / c.budget * 100, 100) : 100;
-    const color = c.status === 'under' ? 'var(--green)' : c.status === 'over' ? 'var(--red)' : 'var(--gray)';
-    return `<div class="cat" data-cat="${c.name}">
-      <div class="cat-line"><span>${c.name}</span>
-        <span class="cat-amt">${ils(c.actual)}
-          <small>מתוך תקציב של</small>
-          <input type="number" class="budget-edit" data-id="${c.id}" value="${c.budget || ''}"
+    const ratio = c.budget ? c.actual / c.budget : 0;
+    const inPct = Math.min(ratio, 1) * BUDGET_MARK;
+    // Overflow is compressed: twice the budget fills the headroom completely, and worse
+    // than that saturates. The exact shekel figure rides in the badge, so the cap costs
+    // emphasis, never information.
+    const overPct = ratio > 1 ? Math.min(ratio - 1, 1) * (100 - BUDGET_MARK) : 0;
+    const over = c.budget > 0 && c.actual > c.budget;
+    // Status is never colour alone: each badge carries a glyph AND words AND the number
+    // that says what to do about it.
+    const badge = !c.budget
+      ? '<span class="badge none">ללא תקציב</span>'
+      : over
+        ? `<span class="badge bad">⚠ חריגה ${ils(c.actual - c.budget)}</span>`
+        : `<span class="badge ok">✓ נשאר ${ils(c.budget - c.actual)}</span>`;
+    return `<div class="cat" data-cat="${escAttr(c.name)}">
+      <div class="cat-line">
+        <span class="cat-name">${escTxt(c.name)}</span>
+        <span class="cat-actual num">${ils(c.actual)}</span>
+        ${c.budget ? `<span class="cat-pct">${Math.round(ratio * 100)}%</span>` : ''}
+        <span class="cat-budget">
+          <span>תקציב</span>
+          <input type="number" class="budget-edit" data-id="${escAttr(c.id)}" value="${c.budget || ''}"
                  min="0" step="50" placeholder="—" title="שינוי התקציב החודשי — נשמר אוטומטית">
-          <small>₪</small>${c.suggested
-            ? `<span class="sugg-tag" title="חושב אוטומטית מהממוצע של 3 החודשים האחרונים — כל שינוי ידני יחליף אותו לצמיתות">מוצע</span>`
-            : ''}</span></div>
-      <div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+          <span>₪</span>${c.suggested
+            ? '<span class="sugg-tag" title="חושב אוטומטית מהממוצע של 3 החודשים האחרונים — כל שינוי ידני יחליף אותו לצמיתות">מוצע</span>'
+            : ''}</span>
+        ${badge}
+      </div>
+      <div class="bullet" title="${escAttr(c.budget
+          ? `${Math.round(ratio * 100)}% מהתקציב` : 'לא הוגדר תקציב')}">
+        <div class="track">
+          <i class="b-in${overPct ? ' split' : ''}" style="width:${inPct}%"></i>
+          ${overPct ? `<i class="b-over" style="width:${overPct}%"></i>` : ''}
+        </div>
+        ${c.budget ? `<span class="tick" style="inset-inline-start:${BUDGET_MARK}%"></span>` : ''}
+      </div>
+    </div>`;
   }).join('') || '<div class="hint">אין עדיין הוצאות החודש 🎉</div>';
   document.querySelectorAll('.cat').forEach(el => el.onclick = e => {
     if (e.target.classList.contains('budget-edit')) return;  // editing, not navigating
@@ -687,18 +753,19 @@ function renderTxns() {
   // (dim_category minus 'income'), so rendering one here would show the wrong option
   // selected and let a salary be filed under "groceries".
   const catCell = t => t[10]
-    ? `<td><span class="catname">${t[3]}</span></td>`
+    ? `<td><span class="catname">${escTxt(t[3])}</span></td>`
     : `<td><select class="recat" data-m="${escAttr(t[2])}">${DATA.categories.map(c =>
-      `<option value="${c.id}" ${c.id === t[7] ? 'selected' : ''}>${c.name}</option>`).join('')}</select></td>`;
+      `<option value="${escAttr(c.id)}" ${c.id === t[7] ? 'selected' : ''}>${escTxt(c.name)}</option>`
+      ).join('')}</select></td>`;
   const issCell = t => {
     const s = issuerOf(t[8]);
     return `<td><span class="iss" title="${escAttr(t[9] || s.label)}">
       <i style="background:${s.color}"></i>${s.label}</span></td>`;
   };
   $('t').tBodies[0].innerHTML = rows.map(t =>
-    `<tr><td class="num">${t[1]}</td><td>${t[2]}</td>${issCell(t)}${catCell(t)}
+    `<tr><td class="num">${t[1]}</td><td>${escTxt(t[2])}</td>${issCell(t)}${catCell(t)}
      <td class="amt nums ${t[10] ? 'in' : ''}">${t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
-     <td><button class="del" title="הסתרת התנועה" data-id="${t[6]}">🗑</button></td></tr>`).join('')
+     <td><button class="del" title="הסתרת התנועה" data-id="${escAttr(t[6])}">🗑</button></td></tr>`).join('')
     || '<tr><td colspan="7" class="hint">לא נמצאו תנועות</td></tr>';
   document.querySelectorAll('#t .del').forEach(b => b.onclick = () => {
     if (confirm('להסתיר את התנועה מכל החישובים?')) api('/api/remove', { transaction_id: b.dataset.id });
@@ -1107,8 +1174,8 @@ function renderTrends(m) {
     // data. Using .at(-1) made every card read ₪0 whenever the newest month happened
     // to be empty, while its own bars clearly showed spending.
     const latest = ils((c.series[mi] || { actual: 0 }).actual);
-    return `<div class="catcard" data-cat="${c.name}">
-      <div class="cc-head"><span>${c.name}</span>
+    return `<div class="catcard" data-cat="${escAttr(c.name)}">
+      <div class="cc-head"><span>${escTxt(c.name)}</span>
         <span class="badge ${badge}">${under}/${withBudget} בתקציב</span></div>
       <div class="cc-chart">
         <div class="cc-plot"><div class="cc-bars">${bars}${tline}</div>${months}</div>

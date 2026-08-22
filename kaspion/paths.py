@@ -1,19 +1,12 @@
-"""Where a household's data lives — always OUTSIDE the installation directory.
+"""Where a household's data lives — always OUTSIDE the installation directory, so an
+installed copy can sit in a read-only or shared location and two people on one machine
+never share a database. See "Where things live" in docs/HOW_IT_WORKS.md.
 
-An installed copy may sit in a read-only or shared location (/Applications, Program
-Files, a zip unpacked anywhere), and two people on one machine must not share a
-database. So the DuckDB file, the AES key, the encrypted credentials and the generated
-dashboard live in the OS's per-user data directory, never next to the code.
+Nothing here creates a directory: callers mkdir before writing, so merely importing
+kaspion never touches the filesystem.
 
-This is also what guarantees a distributed copy carries no data: there is nothing to
-carry, because nothing is written into the tree that gets zipped.
-
-These functions do NOT create anything — callers mkdir before writing. Creating
-directories at import time would make merely importing kaspion touch the filesystem.
-
-KASPION_DATA_DIR overrides the location (tests, or data on an external disk). Set it
-BEFORE importing kaspion: db.py, crypto.py and report.py each resolve their path into a
-module-level constant at import time, so changing the variable afterwards has no effect.
+KASPION_DATA_DIR overrides the location, but must be set BEFORE importing kaspion —
+db.py, crypto.py and report.py each resolve it into a module constant at import time.
 """
 from __future__ import annotations
 
