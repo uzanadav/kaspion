@@ -21,11 +21,12 @@ where account_type = 'bank'
       or raw_description like '%כרטיסי אשראי%'
   )
 
--- ONE statement debit per card per month. The issuer also debits small fees (דמי כרטיס)
--- from the same account, under a description identical to the statement's: Max posts
--- ~₪6 the day before or after every monthly חיוב, plus the odd ₪59. Matching on issuer
--- name alone swallowed those as statement debits and dropped them out of spend
--- entirely — they are real money the household paid, not a card statement.
+-- ONE statement debit per card per month. The issuer also posts small separate debits
+-- from the same account, under a description identical to the statement's: ~₪6 the day
+-- before or after every monthly חיוב, plus the odd ₪59. (NOT דמי כרטיס — that is ₪17.90
+-- and is charged on the card side, not here.) Whatever they are, matching on issuer name
+-- alone swallowed them as statement debits and dropped them out of spend entirely — they
+-- are real money leaving the account, and no card statement arrives twice in a month.
 --
 -- The largest debit of the month wins, which needs no threshold to tune: a statement is
 -- three orders of magnitude above a fee.
