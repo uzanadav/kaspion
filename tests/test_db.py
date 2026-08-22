@@ -64,3 +64,15 @@ def test_preassigned_id_still_checked_against_existing_content():
                account_id="visaCal-4825", transaction_id="a-new-different-id")
     kept = assign_natural_ids([row], con)
     assert kept == []
+
+
+def test_same_amount_in_different_shapes_is_one_transaction():
+    """A scraper hands back a float, a statement parser a Decimal-shaped string. Keying
+    on str(amount) made "-10.0" and "-10.00" two different transactions and let the
+    duplicate through — the very thing this function exists to stop."""
+    from decimal import Decimal
+
+    rows = [_row("2026-08-12", -10.0, "coffee"),
+            _row("2026-08-12", Decimal("-10.00"), "coffee"),
+            _row("2026-08-12", "-10.000", "coffee")]
+    assert len(assign_natural_ids(rows, _con())) == 1

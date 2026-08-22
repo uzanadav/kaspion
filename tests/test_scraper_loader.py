@@ -1,4 +1,7 @@
+import subprocess
+
 import duckdb
+import pytest
 
 from kaspion.db import DDL
 from kaspion.ingest.scraper_loader import _assign_ids
@@ -65,3 +68,51 @@ def test_rescraping_the_same_transaction_does_not_duplicate_it():
     )
     second = _assign_ids([_row(None, "2026-06-01", -50, "coffee")], con)
     assert second == []  # already known by content — nothing new to insert
+
+
+def test_vendored_browser_cache_is_only_forced_when_it_exists(tmp_path, monkeypatch):
+    """Pointing puppeteer at a .puppeteer folder that isn't there (an install predating
+    the vendored browser, or a dev checkout) made EVERY bank fail with UNKNOWN."""
+    from kaspion.ingest import scraper_loader as sl
+
+    seen: dict = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw["env"])
+        raise subprocess.TimeoutExpired(cmd, 1)   # stop before any real scraping
+
+    monkeypatch.setattr(sl.subprocess, "run", fake_run)
+    cfg = {"credentials": {}, "type": "bank"}
+
+    monkeypatch.setattr(sl, "PUPPETEER_CACHE", tmp_path / "missing")
+    with pytest.raises(sl.ScrapeError):
+        sl._scrape_company("max", cfg, 7)
+    assert "PUPPETEER_CACHE_DIR" not in seen
+
+    seen.clear()
+    monkeypatch.setattr(sl, "PUPPETEER_CACHE", tmp_path)
+    with pytest.raises(sl.ScrapeError):
+        sl._scrape_company("max", cfg, 7)
+    assert seen["PUPPETEER_CACHE_DIR"] == str(tmp_path)
+
+
+def test_zero_amount_placeholder_is_replaced_by_the_settled_charge(tmp_path, monkeypatch):
+    """A pending Max purchase arrives as 0 and settles later under the same id; without
+    the purge, ON CONFLICT DO NOTHING would leave ₪0 on the dashboard forever."""
+    from kaspion.ingest import scraper_loader as sl
+
+    db = tmp_path / "t.duckdb"
+    monkeypatch.setattr(sl, "connect", lambda: duckdb.connect(str(db)))
+    con = duckdb.connect(str(db))
+    con.execute(DDL)
+    con.execute("INSERT INTO raw.transactions (transaction_id, account_id, account_type,"
+                " posted_date, amount, currency, raw_description, source) VALUES "
+                "('abc', 'max-1', 'credit_card', DATE '2026-08-18', 0, 'ILS', 'בריכה', 'max')")
+    con.close()
+
+    sl._ingest([{"source_id": "abc", "account_id": "max-1", "account_type": "credit_card",
+                 "posted_date": "2026-08-18", "amount": -160.0, "currency": "ILS",
+                 "raw_description": "בריכה", "source": "max"}])
+
+    con = duckdb.connect(str(db))
+    assert con.execute("SELECT amount FROM raw.transactions").fetchall() == [(-160,)]

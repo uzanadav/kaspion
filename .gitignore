@@ -18,6 +18,8 @@ node_modules/
 # created by the installers: vendored uv, and the Chromium the scraper drives
 .tools/
 .puppeteer/
+# created on first launch: the kaspion:// handler the dashboard's start button opens
+Kaspion.app/
 *.egg-info/
 .ruff_cache/
 evals/last_run.json
@@ -27,3 +29,6 @@ dbt/logs/
 dbt/.user.yml
 logs/
 .DS_Store
+
+# release artifacts from scripts/build-release.sh
+kaspion-*.zip

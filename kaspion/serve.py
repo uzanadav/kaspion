@@ -35,20 +35,25 @@ HOST, PORT = "127.0.0.1", 8765
 # for the file case we must allow its "null" origin — and nothing else.
 ALLOWED_ORIGINS = {None, "null", f"http://{HOST}:{PORT}", f"http://localhost:{PORT}"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-# ThreadingHTTPServer means one client's idle/slow connection can no longer freeze the
-# whole dashboard for everyone else — a single-threaded HTTPServer blocks on ANY open
-# connection until it sends its next request, and a browser tab left open is enough to
-# hang every other request server-wide (this was hit for real, not hypothetical).
-# This lock puts that same serial guarantee back specifically around DB/dbt-touching
-# work: DuckDB allows only one process a read-write connection at a time, so two
-# requests must never run dbt/report subprocesses concurrently.
+# ThreadingHTTPServer so one idle browser tab cannot hang every other request. This lock
+# puts the serial guarantee back only where it is needed: DuckDB allows a single
+# read-write connection, so no two requests may run dbt/report subprocesses at once.
 _DB_LOCK = threading.Lock()
-# live sync progress, polled by the dashboard (GET /api/sync-status) while a POST
-# /api/sync is in flight — the POST itself only resolves once the whole pipeline (scrape
-# + dbt + categorize) is done, which can take minutes, so this is the only way to show
-# "מקס — הצליח" while it's still running rather than one message at the very end.
+# live sync progress, polled by GET /api/sync-status while a POST /api/sync is still in
+# flight — that POST takes minutes, so it is the only way to show per-institution
+# progress rather than one message at the very end.
 _sync_status: dict = {"running": False, "lines": []}
 _sync_lock = threading.Lock()
+
+
+class SyncError(RuntimeError):
+    """A sync that exited non-zero. A traceback is not an error message for a household
+    member, so the user-facing sentence and the raw output tail travel separately — the
+    dashboard shows the sentence and hides the tail behind "פרטים טכניים"."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__("הסנכרון לא הושלם — ראו את שורות הסטטוס שלמעלה")
+        self.detail = detail
 
 
 def _build_report() -> None:
@@ -106,7 +111,13 @@ class Handler(BaseHTTPRequestHandler):
                 # report. Unguarded, that raised once PER REQUEST: a window full of
                 # tracebacks and a page that never loads. Say what to do instead.
                 try:
-                    _build_report()
+                    # under _DB_LOCK like every other DB-touching path: this spawns a
+                    # process that opens the DuckDB file read-write, and a sync holding
+                    # the lock has it open already — unsynchronised, the page load fails
+                    # with a DuckDB "file is locked" that explains nothing to the reader
+                    with _DB_LOCK:
+                        if not OUT.exists():  # another thread may have built it while we waited
+                            _build_report()
                 except subprocess.CalledProcessError:
                     self.send_error(
                         500,
@@ -202,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
                                     _sync_status["lines"].append(line[len("STATUS::"):])
                         proc.wait()
                         if proc.returncode != 0:
-                            raise RuntimeError("\n".join(output[-15:]))
+                            raise SyncError("\n".join(output[-15:]))
                     finally:
                         with _sync_lock:
                             _sync_status["running"] = False
@@ -280,7 +291,9 @@ class Handler(BaseHTTPRequestHandler):
             # any endpoint's failure (bad payload, failed subprocess, missing file)
             # must reach the UI as a message, never crash the server or hang the request
             except Exception as exc:  # noqa: BLE001 - see above
-                body = json.dumps({"ok": False, "error": str(exc)}).encode()
+                body = json.dumps({"ok": False, "error": str(exc),
+                                    "detail": getattr(exc, "detail", "")},
+                                   ensure_ascii=False).encode()
                 self.send_response(400)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
