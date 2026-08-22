@@ -12,6 +12,14 @@ models:
               values: ['bank', 'credit_card']
       - name: merchant_key
         tests: [not_null]
+      # money and its coordinates: a null here does not raise, it silently drops the
+      # row out of a sum and quietly changes a household's totals
+      - name: account_id
+        tests: [not_null]
+      - name: posted_date
+        tests: [not_null]
+      - name: amount
+        tests: [not_null]
 
   - name: int_transfers_detected
     description: Both legs of detected inter-account (bank<->bank) transfers.
@@ -30,10 +38,14 @@ models:
     columns:
       - name: category_id
         tests: [unique, not_null]
+      - name: name_he
+        tests: [not_null]
 
   - name: fct_spend
     description: One row per real spend transaction; transfers and card debits excluded.
     columns:
+      - name: transaction_id
+        tests: [unique, not_null]
       - name: category_id
         tests:
           - not_null

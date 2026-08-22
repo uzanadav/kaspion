@@ -133,7 +133,12 @@ def _collect() -> dict:
                case when t.amount > 0 then 1 else 0 end as is_income,
                -- normalized in stg_transactions (branch digits stripped): the only stable
                -- merchant identity, needed to spot recurring charges and first-time ones
-               t.merchant_key
+               t.merchant_key,
+               -- t[12]/t[13]: this row is half of a charge<->refund pair, and which half.
+               -- Both stay in the list (hiding a real transaction is worse than showing a
+               -- marked one); the badge is what tells the reader it cost nothing.
+               case when t.is_refunded then 1 else 0 end,
+               case when t.is_refund_charge then 1 else 0 end
         from main.int_categorized t join main.dim_category c using (category_id)
         where not t.is_transfer
           and not t.is_card_payment
@@ -173,6 +178,10 @@ def _collect() -> dict:
         where amount > 0
           and not is_transfer
           and not is_card_payment
+          -- the credit half of a refund pair: money coming back, not money earned. A
+          -- ₪40 דמי מנוי refunded two days later read as ₪40 of income and inflated the
+          -- savings figure from both directions at once.
+          and not is_refunded
           and transaction_id not in (select transaction_id from state.excluded_transactions)
         group by 1
     """)
@@ -196,10 +205,11 @@ def _collect() -> dict:
             "status": status, "suggested": bool(suggested),
         })
 
-    for key, iso, d, desc, cat, amt, src, txn_id, cat_id, issuer, account, is_income, mkey in txns:
+    for (key, iso, d, desc, cat, amt, src, txn_id, cat_id, issuer, account, is_income,
+         mkey, refunded, refund_charge) in txns:
         month(key)["txns"].append(
             [iso, d, desc, cat, float(amt), src, txn_id, cat_id, issuer, account,
-             int(is_income), mkey]
+             int(is_income), mkey, int(refunded), int(refund_charge)]
         )
 
     for key, inc in income:

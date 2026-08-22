@@ -12,6 +12,7 @@ import json
 import subprocess
 import sys
 import threading
+import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -306,8 +307,35 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def _already_serving(port: int) -> bool:
+    """Is a kaspion server already answering on this port?
+
+    Only ours counts: /api/sync-status is this app's own endpoint, and a bare request
+    carries no Origin header, which ALLOWED_ORIGINS permits. Anything else holding the
+    port (another app, a stale socket) fails to answer it and we move to the next port.
+    """
+    try:
+        with urllib.request.urlopen(f"http://{HOST}:{port}/api/sync-status", timeout=1) as r:
+            return "running" in json.loads(r.read())
+    # every failure means "not our server here": refused, timed out, wrong app, bad JSON.
+    # There is nothing to distinguish and nothing to report — we just try the next port.
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def main() -> None:
     global ALLOWED_ORIGINS
+
+    # A second launch must JOIN the running dashboard, never start a rival one. Two
+    # servers on one DuckDB file is not a cosmetic problem: DuckDB gives read-write to a
+    # single process, so the second instance's first sync fails. It also silently moves
+    # the dashboard to another port, so a double-click looks like it "did nothing" while
+    # the browser sits on the old URL.
+    if _already_serving(PORT):
+        url = f"http://{HOST}:{PORT}"
+        print(f"kaspion is already running: {url}")
+        webbrowser.open(url)
+        return
 
     # Try a few ports up from the default: a second instance used to die with an
     # unhandled "Address already in use".

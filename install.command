@@ -7,30 +7,37 @@
 #
 # Safe to re-run: every step below skips work that is already done, so if the download
 # is interrupted you can just double-click again.
+#
+# Console text is English on purpose. Terminals render Hebrew left-to-right — words come
+# out in reverse order — and there is no setting that fixes it (it is an open feature
+# request in both Windows Terminal and conhost, and Terminal.app is no better). Reversed
+# Hebrew is less readable than plain English, so Hebrew lives where it renders correctly:
+# the dashboard and INSTALL.md.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$1"; }
-die() { printf '\n\033[31m✘ %s\033[0m\n' "$1"; echo; read -r -p "הקישו Enter לסגירה"; exit 1; }
+die() { printf '\n\033[31m✘ %s\033[0m\n' "$1"; echo; read -r -p "Press Enter to close"; exit 1; }
 
-echo "מתקין את כספיון — ייקח כ-10 דקות ויוריד כ-1.2GB. דרוש חיבור לאינטרנט."
+echo "Installing kaspion. This takes about 10 minutes and downloads ~1.2GB."
+echo "An internet connection is required."
 
 # ---------- 1. uv, vendored into this folder ----------
 # The official installer, pointed at ./.tools so it touches nothing else on the machine
 # and never edits your shell PATH. uv brings its own Python, so no Python is required.
 if [ ! -x ".tools/uv" ]; then
-  say "[1/4] מוריד את מנהל ההתקנה…"
+  say "[1/4] Downloading the installer..."
   curl -LsSf https://astral.sh/uv/install.sh \
     | env UV_INSTALL_DIR="$PWD/.tools" INSTALLER_NO_MODIFY_PATH=1 sh >/dev/null \
-    || die "הורדת מנהל ההתקנה נכשלה — בדקו את חיבור האינטרנט ונסו שוב"
+    || die "Could not download the installer. Check your internet connection and try again."
 else
-  say "[1/4] מנהל ההתקנה כבר קיים — מדלג"
+  say "[1/4] Installer already present - skipping"
 fi
 UV="$PWD/.tools/uv"
 
 # ---------- 2. Python + libraries ----------
-say "[2/4] מתקין את Python והספריות…"
-"$UV" sync --frozen || die "התקנת הספריות נכשלה"
+say "[2/4] Installing Python and the libraries..."
+"$UV" sync --frozen || die "Installing the libraries failed."
 
 # ---------- 3. the bank scraper ----------
 # node/npm arrive as a Python dependency (nodejs-wheel) and live in .venv/bin, so they
@@ -39,7 +46,7 @@ say "[2/4] מתקין את Python והספריות…"
 # PUPPETEER_CACHE_DIR keeps that browser inside the app folder instead of the shared
 # ~/.cache/puppeteer, which is what makes "uninstall = delete this folder" true, and
 # stops a half-downloaded browser left by some other project from breaking this install.
-say "[3/4] מתקין את רכיב סריקת הבנקים (הורדה גדולה, נא להמתין)…"
+say "[3/4] Installing the bank scraper (large download, please wait)..."
 npm_install() (
   cd scraper
   export PATH="$PWD/../.venv/bin:$PATH" PUPPETEER_CACHE_DIR="$PWD/../.puppeteer"
@@ -54,16 +61,16 @@ npm_install() (
 # and puppeteer then fails instead of re-fetching — so a plain re-run would fail
 # identically forever. Clearing the partial download is what makes re-running work.
 if ! npm_install; then
-  say "ההורדה הופסקה באמצע — מנקה ומנסה שוב…"
+  say "Download was interrupted - cleaning up and retrying..."
   rm -rf .puppeteer scraper/node_modules
-  npm_install || die "התקנת רכיב הסריקה נכשלה — בדקו את חיבור האינטרנט והריצו שוב את install"
+  npm_install || die "Installing the bank scraper failed. Check your internet connection and run install again."
 fi
 
 # ---------- 4. an empty database ----------
-say "[4/4] יוצר בסיס נתונים ריק…"
-"$UV" run python -m kaspion.cli init || die "יצירת בסיס הנתונים נכשלה"
+say "[4/4] Creating an empty database..."
+"$UV" run python -m kaspion.cli init || die "Creating the database failed."
 
-printf '\n\033[32m✔ ההתקנה הושלמה.\033[0m\n'
-echo "להפעלה — לחצו פעמיים על kaspion"
+printf '\n\033[32m** Setup complete. **\033[0m\n'
+echo 'To start kaspion, double-click "kaspion".'
 echo
-read -r -p "הקישו Enter לסגירה"
+read -r -p "Press Enter to close"

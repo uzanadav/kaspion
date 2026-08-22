@@ -321,12 +321,35 @@ installer end to end, and all are enforced by `.github/workflows/windows-check.y
   tree breaks an installed copy and is what would let a distributed zip carry someone
   else's data.
 
+### 7c. Never clamp a bar to its target
+
+The קטגוריות rows are a **bullet chart**: `BUDGET_MARK` (72%) is where the budget sits on
+every track, so the target ticks form one column and an over-budget row runs visibly past
+its own tick. The obvious-looking `Math.min(actual / budget * 100, 100)` shipped here for
+months and made the chart useless: 347%-of-budget and 99%-of-budget drew **identical full
+bars**, and a category with no budget drew a full bar too — the encoding said nothing
+about precisely the rows that need attention. The overflow segment is deliberately
+compressed (2× budget saturates the headroom) with the exact shekel variance in the
+badge, so the cap costs emphasis and never information.
+
+Status on those rows is never colour alone — every badge carries a glyph, words and the
+number (`⚠ חריגה ₪2,220`). Keep it that way: colour-only state is unreadable to a
+colour-blind household member and invisible in a screenshot printed in grey.
+
+**Verify chart geometry by measuring, not by looking** — compare each rendered mark's
+width against the value it encodes (this is how 18/18 rows were confirmed), because a
+wrong bar and a right bar look equally plausible in a screenshot.
+
 ## 8. Layout
 
 ```
 install.command/.bat    what an end user double-clicks once: vendors uv into the app
 kaspion.command/.bat    folder, syncs Python+deps, npm-installs the scraper + Chromium,
-                        then `kaspion init`. The second pair just starts the server.
+uninstall.command/.bat  then `kaspion init`. The second pair just starts the server; the
+                        third unregisters kaspion:// and erases the data folder ONLY on
+                        an exact typed DELETE (tests/test_uninstaller.py guards that).
+                        All of them print ENGLISH: no terminal on either OS renders
+                        Hebrew right-to-left, so Hebrew there comes out word-reversed.
 kaspion/
   paths.py               45 — the per-user data dir (DB, key, credentials, dashboard).
                         PURE: returns paths, never creates them; callers mkdir.
@@ -334,14 +357,14 @@ kaspion/
                         DBT_PROFILES_DIR. `python3 -m kaspion.pipeline build` to run it
                         by hand. A bare `dbt` cannot work — see §10.
   report.py             265 — SQL → DATA dict, month flags, destinations, build_report()
-  assets/app.html       235 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
-  assets/app.css        416 — design tokens (light+dark), all component styles
-  assets/app.js        1148 — the whole client: state, 4 views, 7 charts, edit calls,
+  assets/app.html       271 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
+  assets/app.css        467 — design tokens (light+dark), all component styles
+  assets/app.js        1215 — the whole client: state, 4 views, 7 charts, edit calls,
                         and renderEmptyState() for a brand-new install (§6)
   insights.py           285 — deterministic Hebrew observations (NO AI — see §9)
   db.py                 124 — connect() + DDL + assign_natural_ids() (the shared
                         dedup/id-assignment every ingest path routes through)
-  serve.py              339 — local edit server; every /api/* rebuilds dbt + the report
+  serve.py              352 — local edit server; every /api/* rebuilds dbt + the report
   cli.py                250 — terminal equivalents, plus `init` (fresh empty install)
   ingest/               statements.py (dispatcher) · isracard_file · onezero_file
                         scraper_loader (ScrapeError, add_institution, _node_bin,
@@ -382,9 +405,9 @@ safe but "less than" is not yet knowable), and `income == 0` means not-loaded.
 
 - **Always rebuild and verify after a change:**
   ```bash
-  python3 -m pytest tests/ -q                 # 44 tests
+  python3 -m pytest tests/ -q                 # 57 tests
   python3 -m ruff check .                     # must be clean; config is pinned in pyproject
-  python3 -m kaspion.pipeline build -q        # 20/20 (7 models + 2 seeds + 11 tests)
+  python3 -m kaspion.pipeline build -q        # 27/27 (7 models + 2 seeds + 18 data tests)
   python3 -c "from kaspion.report import build_report; build_report()"
   node --check kaspion/assets/app.js
   ```
