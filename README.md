@@ -33,9 +33,9 @@ Collects your bank & credit-card transactions — automatically via
 [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers), or by dropping the
 monthly statement file onto the dashboard — models them with dbt on DuckDB, detecting
 inter-account transfers and the monthly card debit (חיוב) **so a card statement is never
-counted twice**, categorizes merchants automatically (built-in Israeli merchant rules first,
-local AI via Ollama for the rest, your manual corrections always win and are remembered
-forever), and renders an interactive Hebrew dashboard: income vs. spending, budgets with
+counted twice**, categorizes merchants automatically (built-in Israeli merchant rules by default —
+no model, no download; local AI via Ollama or Claude is opt-in for the rest — and your
+manual corrections always win and are remembered forever), and renders an interactive Hebrew dashboard: income vs. spending, budgets with
 monthly pacing, per-category trends, savings tracking, and inline editing (recategorize, add
 expenses, hide transactions, set budgets, add categories) — all from the browser.
 
@@ -47,7 +47,7 @@ bank / credit card ─┬─ scraper (Node)      ─┐
                     └─ statement upload     ├─▶ raw.transactions ─▶ dbt (staging → transfer &
                        (.xlsx / .xls)      ─┘      (DuckDB)          card-debit detection →
                                                               │      marts + budget pacing)
-                              your overrides > Israeli merchant rules > local AI (Ollama)
+                        your overrides > Israeli merchant rules > optional AI (opt-in)
                                                               │
                                                        dashboard.html
                                               (Hebrew · RTL · interactive · one file)
@@ -91,6 +91,11 @@ of the repo:
 | `dbt/seeds/sample_transactions.csv` — **generated fake data** | `.kaspion_key` + `credentials.json.enc` — encrypted bank logins |
 | `evals/ground_truth.csv` — labels for the fake data | `dashboard.html` — generated, contains your real transactions |
 | Docs, category list, merchant rules | (`.venv/`, dbt artifacts and logs stay gitignored in the repo) |
+
+`.kaspion_key` sits in that same folder, beside the credentials it decrypts: the
+encryption protects a stray copy of `credentials.json.enc` (a backup, a synced folder),
+not someone who already has your user account. `finance.duckdb` is not encrypted at all
+— it is a plain file, safe to back up, not safe to hand around.
 
 The only network calls the tool can ever make: your bank (scraping, TLS) and — only if you
 explicitly opt in to the paid provider — the Anthropic API (merchant *names* only, never
@@ -190,9 +195,9 @@ miscategorized merchant from the dropdown — each fix is permanent and never re
 ### Working on it
 
 ```bash
-python3 -m pytest tests/ -q                 # 44 tests
+python3 -m pytest tests/ -q                 # 51 tests
 python3 -m ruff check .                     # config pinned in pyproject.toml
-python3 -m kaspion.pipeline build -q        # 20/20 — every build runs the data tests
+python3 -m kaspion.pipeline build -q        # 27/27 — every build runs the data tests
 python3 -c "from kaspion.report import build_report; build_report()"
 node --check kaspion/assets/app.js          # the frontend is a real file, not a string
 ```

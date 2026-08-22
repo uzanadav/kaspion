@@ -30,7 +30,7 @@ One command runs the whole chain: `python3 sync.py`. Everything happens on this 
 | **Tool** | DuckDB — a free database that lives in one file: `finance.duckdb`, in your per-user data folder (see the table at the bottom) |
 | **Command** | (automatic, part of `sync.py`) |
 | **What it does** | Saves every transaction once (duplicates are detected and skipped, so re-running is always safe). Also holds your corrections and budgets. |
-| **Why** | One private file = easy to back up (`cp`), impossible to leak. Like a tiny personal Snowflake. |
+| **Why** | One private file = easy to back up (`cp`), nothing to leak to a third party — it never leaves your machine. It is not encrypted, so treat a copy of it the way you would treat a bank statement. Like a tiny personal Snowflake. |
 
 ### How a duplicate is recognised
 
@@ -61,7 +61,7 @@ collapsing to one row is the safer default for a finance app.
 | **Tool** | dbt — turns raw data into clean, tested tables using SQL |
 | **Command** | (automatic, part of `sync.py`) — manually: `python3 -m kaspion.pipeline build` |
 | **What it does** | Three smart things: **(a)** finds transfers between your own accounts and removes them from "spending" (moving money isn't spending); **(b)** finds the monthly credit-card debit (חיוב) on the bank account and removes it too — otherwise every shekel on the card would be counted twice; **(c)** computes budget pacing: "given it's the 12th of the month, are we ahead or behind?" |
-| **Why** | This is what makes the numbers on the dashboard *true*. Every rule is a tested model — 21 automatic checks run on every build. |
+| **Why** | This is what makes the numbers on the dashboard *true*. Every rule is a tested model — 18 automatic data tests run on every build. |
 
 ## Step 4 — Categorize
 
