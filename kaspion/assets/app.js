@@ -68,7 +68,9 @@ const niceCeil = v => {
 // NOT catch a negative row filed under 'income' (a PAYBOX reversal, a card fee, interest) —
 // pacing excludes category_id='income' outright, and a chart that keeps those rows totals
 // ₪761 more than the figure printed above it. Verified against all five months.
-const isSpend = t => !t[10] && t[7] !== 'income';
+// t[12]: a charge that was refunded is not spending — fct_spend drops both legs, and a
+// chart that kept the charge would disagree with the ₪ figure printed above it.
+const isSpend = t => !t[10] && t[7] !== 'income' && !t[12];
 // Charts are drawn in real pixels, never a stretched viewBox: a viewBox scaled to its
 // container scales the type with it, and an 11px label becomes 6px on a phone. Safe to
 // measure here because applyView() always runs before render(), so #v-trends is on screen
@@ -762,9 +764,17 @@ function renderTxns() {
     return `<td><span class="iss" title="${escAttr(t[9] || s.label)}">
       <i style="background:${s.color}"></i>${s.label}</span></td>`;
   };
+  // Both halves of a charge<->refund pair stay in the list — hiding a real transaction is
+  // worse than showing a marked one. The badge carries the meaning, and the struck-through
+  // amount on the charge says "this cost you nothing" without needing to read the badge.
+  const rfnd = t => !t[12] ? '' :
+    `<span class="rfnd" title="${t[13] ? 'החיוב הזה הוחזר במלואו — הוא לא נספר בהוצאות'
+                                       : 'זהו החזר של חיוב קודם — הוא לא נספר בהכנסות'}">↩ ${
+      t[13] ? 'הוחזר' : 'החזר'}</span>`;
   $('t').tBodies[0].innerHTML = rows.map(t =>
-    `<tr><td class="num">${t[1]}</td><td>${escTxt(t[2])}</td>${issCell(t)}${catCell(t)}
-     <td class="amt nums ${t[10] ? 'in' : ''}">${t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
+    `<tr><td class="num">${t[1]}</td><td>${escTxt(t[2])}${rfnd(t)}</td>${issCell(t)}${catCell(t)}
+     <td class="amt nums ${t[10] ? 'in' : ''} ${t[12] && t[13] ? 'struck' : ''}">${
+       t[10] ? '+' : ''}${ils(t[4])}</td><td>${t[5]}</td>
      <td><button class="del" title="הסתרת התנועה" data-id="${escAttr(t[6])}">🗑</button></td></tr>`).join('')
     || '<tr><td colspan="7" class="hint">לא נמצאו תנועות</td></tr>';
   document.querySelectorAll('#t .del').forEach(b => b.onclick = () => {

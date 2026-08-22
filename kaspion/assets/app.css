@@ -348,6 +348,13 @@ tr:last-child td { border-bottom:0 }
 .srcage.warn { background:var(--warn-bg); color:var(--warn-ink) }
 .srcage.old  { background:var(--neg-bg); color:var(--neg-ink) }
 @media (max-width:640px) { .srcrow { flex-wrap:wrap } .srcrange { order:3; width:100%; margin-inline-start:24px } }
+/* refund pair: the charge is struck through so it reads as costing nothing at a glance,
+   and never has to be mentally subtracted from the column; the badge names which half */
+.rfnd { display:inline-block; margin-inline-start:8px; padding:1px 7px; border-radius:999px;
+        font-size:.72rem; font-weight:600; white-space:nowrap;
+        background:var(--pos-bg); color:var(--pos-ink) }
+.amt.struck { text-decoration:line-through; opacity:.5 }
+
 /* issuer badge: colored dot carries identity, text stays in the normal ink color */
 .iss { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:.82rem }
 .iss i { width:9px; height:9px; border-radius:50%; flex:none }
