@@ -2,3 +2,10 @@
 # must not ship the 341-row synthetic demo dataset. It stays tracked and available for
 # local development — this only affects the archive, never a normal clone or checkout.
 dbt/seeds/sample_transactions.csv export-ignore
+
+# Developer tooling that has no business in a stranger's download. .claude/settings.json
+# in particular holds absolute deny-paths under the developer's home directory, which
+# would hand every recipient the developer's username.
+.claude/ export-ignore
+.github/ export-ignore
+evals/ export-ignore

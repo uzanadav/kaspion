@@ -23,10 +23,22 @@ echo "built $OUT ($(du -h "$OUT" | cut -f1))"
 # an archive that has not passed this.
 echo
 echo "checking the archive for personal data…"
-LEAKS="$(unzip -l "$OUT" | grep -iE 'duckdb|\.enc$|kaspion_key|dashboard\.html|sample_transactions|\.venv/|node_modules/|\.puppeteer/|\.tools/' || true)"
+LEAKS="$(unzip -l "$OUT" | grep -iE 'duckdb|\.enc$|kaspion_key|dashboard\.html|sample_transactions|\.venv/|node_modules/|\.puppeteer/|\.tools/|\.claude/' || true)"
 if [ -n "$LEAKS" ]; then
   echo "REFUSING TO SHIP — the archive contains:" >&2
   echo "$LEAKS" >&2
+  rm -f "$OUT"
+  exit 1
+fi
+
+# Absolute home paths identify whoever built the archive. Caught for real: a committed
+# .claude/settings.json carried deny-rules under /Users/<name>/, which would have handed
+# the developer's username to every recipient.
+HOMEPATHS="$(unzip -p "$OUT" | grep -aoE '(/Users/|/home/|C:\\\\Users\\\\)[A-Za-z0-9._-]+' \
+             | grep -avE '/Users/(runner|shared)' | sort -u || true)"
+if [ -n "$HOMEPATHS" ]; then
+  echo "REFUSING TO SHIP — the archive leaks absolute home paths:" >&2
+  echo "$HOMEPATHS" | sed 's/^/  /' >&2
   rm -f "$OUT"
   exit 1
 fi
