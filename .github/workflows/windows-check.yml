@@ -136,11 +136,26 @@ jobs:
   windows-installer:
     runs-on: windows-latest
     steps:
+      # fetch-depth 0: build-release.sh uses `git describe` for the version
       - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
 
-      - name: Run the real installer (install.bat)
+      # Install from the REAL release artifact, not the checkout: users get a zip, and
+      # a checkout would not catch anything the archive drops or mangles (the executable
+      # bit on the .command launchers, install.ps1's UTF-8 BOM without which PowerShell
+      # 5.1 cannot parse its Hebrew, or a stray file the leak check should have blocked).
+      - name: Build the release zip and unpack it as a user would
+        shell: bash
+        run: |
+          bash scripts/build-release.sh
+          mkdir -p "$RUNNER_TEMP/unzipped"
+          unzip -q kaspion-*.zip -d "$RUNNER_TEMP/unzipped"
+          echo "APP_DIR=$RUNNER_TEMP/unzipped/kaspion" >> "$GITHUB_ENV"
+
+      - name: Run the real installer (install.bat) from the unzipped folder
         run: .\install.bat
         shell: cmd
+        working-directory: ${{ env.APP_DIR }}
 
       - name: The installer produced a working, self-contained install
         shell: python
@@ -148,7 +163,7 @@ jobs:
           import os, subprocess, sys
           from pathlib import Path
 
-          root = Path.cwd()
+          root = Path(os.environ["APP_DIR"])
           venv_python = root / ".venv" / "Scripts" / "python.exe"
           assert (root / ".tools" / "uv.exe").exists(), "uv was not vendored into the app folder"
           assert venv_python.exists(), ".venv was not created"
@@ -172,10 +187,10 @@ jobs:
       - name: The installed app launches a browser and finds its own Chromium
         shell: python
         run: |
-          import subprocess
+          import os, subprocess
           from pathlib import Path
 
-          root = Path.cwd()
+          root = Path(os.environ["APP_DIR"])
           # exercise the real path: scraper_loader -> node.exe -> puppeteer -> Chromium.
           # An unknown company fails inside the scraper AFTER the browser is up, so this
           # proves the browser resolved without contacting any bank.
@@ -198,10 +213,10 @@ jobs:
       - name: The launcher starts the server and serves the dashboard
         shell: python
         run: |
-          import subprocess, time, urllib.request
+          import os, subprocess, time, urllib.request
           from pathlib import Path
 
-          root = Path.cwd()
+          root = Path(os.environ["APP_DIR"])
           proc = subprocess.Popen([str(root / ".tools" / "uv.exe"), "run", "python", "-m", "kaspion.serve"],
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                   text=True, encoding="utf-8")
@@ -220,3 +235,32 @@ jobs:
               print("OK: launcher serves the empty-state dashboard")
           finally:
               proc.kill()
+
+      # kaspion.bat registers the kaspion:// handler behind the dashboard's "start
+      # kaspion" button. tests/test_launcher_button.py only greps the files for matching
+      # strings — it cannot prove `reg add` actually lands, and this is the one path a
+      # non-technical user hits when the server is down.
+      - name: The launcher registers the kaspion:// handler
+        shell: python
+        run: |
+          import os, subprocess, winreg
+          from pathlib import Path
+
+          root = Path(os.environ["APP_DIR"])
+          # run only the reg lines: kaspion.bat itself ends in `pause`, which would hang
+          # the job, and the serve path is already covered by the step above.
+          bat = (root / "kaspion.bat").read_text(encoding="utf-8", errors="replace")
+          cmds = [ln.strip() for ln in bat.splitlines() if ln.strip().lower().startswith("reg add")]
+          assert len(cmds) == 3, f"expected 3 reg add lines in kaspion.bat, found {len(cmds)}"
+          for c in cmds:
+              subprocess.run(c.replace("%~dp0", str(root) + "\\"), shell=True, check=True)
+
+          with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\kaspion") as k:
+              assert winreg.QueryValueEx(k, "")[0] == "URL:kaspion"
+              winreg.QueryValueEx(k, "URL Protocol")      # must exist, or Windows ignores the scheme
+          with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                              r"Software\Classes\kaspion\shell\open\command") as k:
+              target = winreg.QueryValueEx(k, "")[0]
+          print("handler ->", target)
+          assert "kaspion.bat" in target.lower(), f"handler does not point at the launcher: {target}"
+          print("OK: kaspion:// resolves to this install's launcher")
