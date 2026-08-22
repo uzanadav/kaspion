@@ -11,10 +11,10 @@ if [ -x ".tools/uv" ] && [ -d ".venv" ]; then
 elif [ -x ".venv/bin/python" ]; then
   RUN=(.venv/bin/python)
 else
-  echo "כספיון עדיין לא הותקן."
-  echo "לחצו פעמיים על install (באותה תיקייה) והריצו שוב."
+  echo "kaspion is not installed yet."
+  echo 'Double-click "install" in this same folder, then try again.'
   echo
-  read -r -p "הקישו Enter לסגירה"
+  read -r -p "Press Enter to close"
   exit 1
 fi
 
@@ -27,10 +27,25 @@ fi
 # signed binary. The applet finds this folder from its own location at run time, so
 # moving or renaming the kaspion folder cannot leave a handler pointing at nothing.
 APP="Kaspion.app"
-if [ ! -d "$APP" ]; then
-  osacompile -o "$APP" -e 'on open location u
+# Rebuilt whenever this file is newer than the applet, so an edit here can never leave a
+# stale bundle behind: the first version handled only `on open location` and did nothing
+# at all when double-clicked — it launched, found no `on run`, and quit.
+if [ ! -d "$APP" ] || [ "$APP" -ot "$0" ]; then
+  rm -rf "$APP"
+  # Two ways in, one behaviour: `on run` is a double-click on the app icon (which is what
+  # people actually do, it looks like the app), `on open location` is the kaspion:// URL
+  # the dashboard's start button opens. Both just run kaspion.command next to the bundle.
+  osacompile -o "$APP" -e 'on kaspionLaunch()
 	set a to quoted form of POSIX path of (path to me)
 	do shell script "open \"$(dirname " & a & ")/kaspion.command\""
+end kaspionLaunch
+
+on run
+	kaspionLaunch()
+end run
+
+on open location u
+	kaspionLaunch()
 end open location' \
   && /usr/libexec/PlistBuddy \
       -c 'Add :CFBundleURLTypes array' \

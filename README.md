@@ -171,6 +171,7 @@ miscategorized merchant from the dropdown — each fix is permanent and never re
 |---|---|
 | `install.command` / `install.bat` | what an end user double-clicks, once |
 | `kaspion.command` / `kaspion.bat` | what they double-click every time after |
+| `uninstall.command` / `uninstall.bat` | removes the URL handler and, only on an explicit `DELETE`, the data folder |
 | `sync.py` | the one entrypoint: ingest → dbt → categorize → dashboard |
 | `kaspion/paths.py` | where the database, key, credentials and dashboard live — **outside** this folder, per user |
 | `kaspion/pipeline.py` | the only place dbt is invoked (sets `KASPION_DB_PATH`); run it directly with `python3 -m kaspion.pipeline build` |
@@ -195,7 +196,7 @@ miscategorized merchant from the dropdown — each fix is permanent and never re
 ### Working on it
 
 ```bash
-python3 -m pytest tests/ -q                 # 51 tests
+python3 -m pytest tests/ -q                 # 57 tests
 python3 -m ruff check .                     # config pinned in pyproject.toml
 python3 -m kaspion.pipeline build -q        # 27/27 — every build runs the data tests
 python3 -c "from kaspion.report import build_report; build_report()"

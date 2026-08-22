@@ -345,7 +345,11 @@ wrong bar and a right bar look equally plausible in a screenshot.
 ```
 install.command/.bat    what an end user double-clicks once: vendors uv into the app
 kaspion.command/.bat    folder, syncs Python+deps, npm-installs the scraper + Chromium,
-                        then `kaspion init`. The second pair just starts the server.
+uninstall.command/.bat  then `kaspion init`. The second pair just starts the server; the
+                        third unregisters kaspion:// and erases the data folder ONLY on
+                        an exact typed DELETE (tests/test_uninstaller.py guards that).
+                        All of them print ENGLISH: no terminal on either OS renders
+                        Hebrew right-to-left, so Hebrew there comes out word-reversed.
 kaspion/
   paths.py               45 — the per-user data dir (DB, key, credentials, dashboard).
                         PURE: returns paths, never creates them; callers mkdir.
@@ -401,7 +405,7 @@ safe but "less than" is not yet knowable), and `income == 0` means not-loaded.
 
 - **Always rebuild and verify after a change:**
   ```bash
-  python3 -m pytest tests/ -q                 # 51 tests
+  python3 -m pytest tests/ -q                 # 57 tests
   python3 -m ruff check .                     # must be clean; config is pinned in pyproject
   python3 -m kaspion.pipeline build -q        # 27/27 (7 models + 2 seeds + 18 data tests)
   python3 -c "from kaspion.report import build_report; build_report()"

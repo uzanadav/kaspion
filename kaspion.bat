@@ -20,8 +20,8 @@ exit /b 0
 
 :notinstalled
 echo.
-echo כספיון עדיין לא הותקן.
-echo לחצו פעמיים על install.bat (באותה תיקייה) והריצו שוב.
+echo kaspion is not installed yet.
+echo Double-click install.bat in this same folder, then try again.
 echo.
 pause
 exit /b 1

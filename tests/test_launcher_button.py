@@ -26,3 +26,13 @@ def test_handler_registration_cannot_abort_the_launch():
     mac = (ROOT / "kaspion.command").read_text()
     chain = mac.split("osacompile", 1)[1].split("\nfi", 1)[0]
     assert "|| true" in chain
+
+
+def test_the_applet_is_launchable_by_double_click_not_only_by_url():
+    """Kaspion.app is what a person actually clicks — it carries the icon and the name.
+    Built with only `on open location` it answered kaspion:// URLs but did nothing at
+    all when double-clicked: it launched, found no `on run`, and quit. Both entry points
+    must exist, and kaspion.command must rebuild a stale bundle rather than keep one."""
+    mac = (ROOT / "kaspion.command").read_text()
+    assert "on run" in mac and "on open location" in mac
+    assert '-ot "$0"' in mac, "a stale Kaspion.app must be rebuilt when this file changes"
