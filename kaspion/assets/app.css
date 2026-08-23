@@ -78,17 +78,14 @@ body { font-family:-apple-system, "Segoe UI", "Heebo", Arial, sans-serif;
 #side nav a.on { background:var(--sel); font-weight:700 }
 #side nav a .ico { font-size:1.15rem }
 #side .foot { margin-top:auto; font-size:.68rem; color:var(--soft); text-align:center; line-height:1.7 }
-#syncbtn { margin-top:18px; padding:11px; border-radius:12px; border:1px solid var(--line);
-        background:var(--card); color:var(--ink); font:inherit; font-size:.9rem; cursor:pointer }
-#syncbtn:hover { background:var(--sel) }
-#syncbtn:disabled { opacity:.55; cursor:wait }
-#addacct { margin-top:8px; padding:11px; border-radius:12px; border:1px dashed var(--accent);
-        background:none; color:var(--ink); font:inherit; font-size:.9rem; cursor:pointer }
-#addacct:hover { background:var(--sel) }
-#addacct:disabled { opacity:.55; cursor:wait }
-#themebtn { margin-top:8px; padding:9px; border-radius:12px; border:1px solid transparent;
-        background:none; color:var(--ink-2); font:inherit; font-size:.82rem; cursor:pointer }
-#themebtn:hover { background:var(--sel); border-color:var(--line) }
+/* the three sidebar buttons are one control family: same box, same type, same border
+   as the nav items above them — only the spacing above the group differs */
+#syncbtn, #addacct, #themebtn { padding:11px 14px; border-radius:12px;
+        border:1px solid var(--line); background:var(--card); color:var(--ink);
+        font:inherit; font-size:.95rem; cursor:pointer; margin-top:8px }
+#syncbtn { margin-top:18px }
+#syncbtn:hover, #addacct:hover, #themebtn:hover { background:var(--sel) }
+#syncbtn:disabled, #addacct:disabled { opacity:.55; cursor:wait }
 
 /* ---- header ---- */
 /* content hugs the sidebar on the right instead of floating in the middle */
