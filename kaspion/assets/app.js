@@ -48,7 +48,9 @@ const ACCOUNTS = (() => {
       : issuerOf(iss).label,
   })).sort((a, b) => a.label.localeCompare(b.label, 'he'));
 })();
-const VIEWS = { overview:'סקירה', cats:'קטגוריות', txns:'תנועות', trends:'מגמות' };
+// `|| []` so a dashboard.html generated before trips existed still opens
+const TRIPS = DATA.trips || [];
+const VIEWS = { overview:'סקירה', cats:'קטגוריות', txns:'תנועות', trends:'מגמות', trips:'טיולים' };
 const ils = x => '₪' + Math.round(x).toLocaleString('he-IL');
 const $ = id => document.getElementById(id);
 // merchant names are free text from the bank (e.g. Hebrew "ד"ר" contains a literal
@@ -98,6 +100,9 @@ let accs = [];
 // which months the totals report sums. Month KEYS, never indices — importing a statement
 // adds months and shifts every index. [] means "every month that has already happened".
 let sumMonths = [];
+// which trip the טיולים view is showing. A trip ID, never an index — same reason as
+// sumMonths: adding or deleting a trip reorders the list.
+let tripId = null;
 
 /* ---------- keep your place across the reload every edit triggers ---------- */
 // Saving a category rebuilds the page and reloads it; without this you'd be thrown
@@ -108,6 +113,7 @@ function saveUi() {
     sessionStorage.setItem(UI_KEY, JSON.stringify({
       view, month: DATA.months[mi] ? DATA.months[mi].key : null,
       selCat, sort, flow, search: $('s') ? $('s').value : '', theme, pick, accs, sumMonths,
+      tripId,
     }));
   } catch (e) { /* private mode — never fail an edit over bookkeeping */ }
 }
@@ -138,6 +144,8 @@ function restoreUi() {
   if (Array.isArray(saved.sumMonths)) {
     sumMonths = saved.sumMonths.filter(k => DATA.months.some(m => m.key === k));
   }
+  // a deleted trip must not leave the view pointing at nothing
+  if (TRIPS.some(t => t.id === saved.tripId)) tripId = saved.tripId;
 }
 function applyTheme() {
   document.documentElement.dataset.theme = theme === 'auto' ? '' : theme;
@@ -314,8 +322,34 @@ $('nc-go').onclick = () => {
   api('/api/add-category', { category_id: id, name }, 'nc-msg', 'מוסיף…');
 };
 
-// Upload Isracard statements. Files go up one at a time so a bad file names itself
-// in the error instead of failing the whole batch anonymously.
+/* ---------- statement upload dialog ---------- */
+// A file input styled as a drop zone: the same <input> either way, so drag-and-drop and
+// click-to-browse share one code path and one list of files.
+$('upbtn').onclick = () => {
+  $('u-file').value = '';
+  showPicked();
+  $('u-msg').textContent = '';
+  $('updlg').showModal();
+};
+function showPicked() {
+  const files = [...$('u-file').files];
+  $('u-name').textContent = files.length
+    ? files.map(f => f.name).join(' · ')
+    : 'גררו קובץ לכאן או לחצו לבחירה';
+  $('u-drop').classList.toggle('has', files.length > 0);
+}
+$('u-file').onchange = showPicked;
+$('u-drop').ondragover = e => { e.preventDefault(); $('u-drop').classList.add('over'); };
+$('u-drop').ondragleave = () => $('u-drop').classList.remove('over');
+$('u-drop').ondrop = e => {
+  e.preventDefault();
+  $('u-drop').classList.remove('over');
+  $('u-file').files = e.dataTransfer.files;
+  showPicked();
+};
+
+// Files go up one at a time so a bad file names itself in the error instead of failing
+// the whole batch anonymously.
 $('u-go').onclick = async () => {
   const files = [...$('u-file').files];
   if (!files.length) { $('u-msg').textContent = 'בחרו קובץ Excel שהורדתם מאתר ישראכרט'; return; }
@@ -482,13 +516,24 @@ function render() {
   // guarded in each of them.
   if (!DATA.months.length) return renderEmptyState();
   const m = DATA.months[mi];
-  $('vtitle').innerHTML = `${VIEWS[view]} — <span id="mtitle">${m.label}</span>`;
-  $('subline').textContent = m.isCurrent ? 'החודש הנוכחי · מתעדכן בכל sync' : 'חודש שהסתיים';
-  renderMonths();
+  // טיולים spans months, so it gets no month in the title and no month strip. #mtitle
+  // still exists (empty) — other code addresses that node by id.
+  const spansMonths = view === 'trips';
+  $('vtitle').innerHTML = spansMonths
+    ? `${VIEWS[view]}<span id="mtitle"></span>`
+    : `${VIEWS[view]} — <span id="mtitle">${m.label}</span>`;
+  $('subline').textContent = spansMonths ? ''
+    : (m.isCurrent ? 'החודש הנוכחי · מתעדכן בכל sync' : 'חודש שהסתיים');
+  // style.display, not the hidden attribute: .months sets `display:flex`, which beats
+  // the browser's own [hidden] rule and left the strip on screen. Emptying it instead
+  // would be wrong too — renderMonths() has to redraw it on the way back.
+  $('months').style.display = spansMonths ? 'none' : '';
+  if (!spansMonths) renderMonths();
   if (view === 'overview') renderOverview(m);
   if (view === 'cats') renderCats(m);
   if (view === 'txns') { renderChip(); renderTxns(); }
   if (view === 'trends') renderTrends(m);
+  if (view === 'trips') renderTrips();
   saveUi();
 }
 
@@ -501,14 +546,21 @@ function renderSources() {
     const ageTxt = s.staleDays <= 0 ? 'היום'
                  : s.staleDays === 1 ? 'אתמול'
                  : `לפני ${s.staleDays} ימים`;
-    // one compact row: dot+name, freshness pill, an ISOLATED date range (.num — this
-    // is the bug site: a date range is two LTR runs, and without isolation the bidi
-    // algorithm reorders them), transaction count. Load time moves into the title
-    // tooltip instead of its own line — it's detail, not something read at a glance.
+    // The pill is the age of the newest TRANSACTION, which does not move when a quiet
+    // account genuinely has nothing new — read alone it looks like a sync that failed.
+    // So the last FETCH is on the row too, drop the year to keep it one line. And a
+    // source that can only arrive as a file says so: pressing סנכרון will never move it.
+    // .num on the timestamp, never on the whole phrase: "20.08 21:04" is TWO LTR runs
+    // and the bidi algorithm swaps them into "21:04 20.08" without isolation — the same
+    // bug the date range above already carries a comment about.
+    const fetched = s.upload
+      ? '📄 קובץ בלבד'
+      : `נסרק <span class="num">${escTxt(s.loaded.replace(/\.\d{4} /, ' '))}</span>`;
     return `<div class="srcrow" title="נטען לאחרונה: ${escAttr(s.loaded)} · ${escAttr(s.account)}">
       <span class="srcname"><i style="background:${iss.color}"></i>${iss.label}</span>
       <span class="srcage ${age}">${ageTxt}</span>
       <span class="num srcrange">${s.from} – ${s.to}</span>
+      <span class="srcrange">${fetched}</span>
       <span class="srccount"><b class="num">${s.n.toLocaleString('he-IL')}</b> תנועות</span>
     </div>`;
   }).join('') || '<div class="hint">אין עדיין נתונים</div>';
@@ -1216,6 +1268,103 @@ function renderTrends(m) {
   document.querySelectorAll('.catcard').forEach(el => el.onclick = () => gotoCat(el.dataset.cat));
 
   drawPace(); drawCards(); drawDests(); drawRate();
+}
+
+/* ---------- trips: what did the holiday cost? ---------- */
+// A trip is a date range and nothing else. Which rows belong to it is derived here, on
+// every render, from the rows the page already holds — so a charge that arrives after the
+// trip was created counts the moment it is synced, with nothing to re-save.
+$('tr-go').onclick = () => {
+  const name = $('tr-name').value.trim();
+  const start = $('tr-start').value, end = $('tr-end').value;
+  if (!name || !start || !end) { $('tr-msg').textContent = 'צריך שם, תאריך יציאה ותאריך חזרה'; return; }
+  api('/api/add-trip', { name, country: $('tr-country').value.trim(), start, end }, 'tr-msg');
+};
+
+function renderTrips() {
+  const trip = TRIPS.find(t => t.id === tripId) || TRIPS[0] || null;
+  $('tripseg').innerHTML = TRIPS.map(t =>
+    `<button data-t="${escAttr(t.id)}" class="${trip && t.id === trip.id ? 'on' : ''}">${
+      escTxt(t.name)}${t.country ? ' · ' + escTxt(t.country) : ''}</button>`).join('');
+  $('tripseg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    tripId = b.dataset.t;
+    renderTrips();          // this control re-renders itself, like #sumseg — never render()
+    saveUi();
+  });
+  if (!trip) {
+    $('trip-body').innerHTML = '<div class="panel hint">עדיין לא הוספתם טיול. ' +
+      'מלאו שם ותאריכים למעלה — כל מה שיחויב בין התאריכים יופיע כאן.</div>';
+    return;
+  }
+
+  const ex = new Set(trip.excluded);
+  // t[0] is 'YYYY-MM-DD', so plain string comparison is a correct date comparison.
+  // isSpend, never a bare !t[10]: a negative row filed under 'income' is not an expense
+  // and a refunded charge cost nothing (see the helper at the top of this file).
+  const inRange = DATA.months.flatMap(m => m.txns)
+    .filter(t => t[0] >= trip.start && t[0] <= trip.end)
+    .filter(isSpend)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const rows = inRange.filter(t => !ex.has(t[6]));
+  const total = rows.reduce((sum, t) => sum + t[4], 0);
+  const days = Math.round((Date.parse(trip.end) - Date.parse(trip.start)) / 864e5) + 1;
+  // an unfinished trip must not be presented as a finished one: the total only grows
+  const running = trip.end >= new Date().toISOString().slice(0, 10);
+
+  const byCat = {};
+  rows.forEach(t => { byCat[t[3]] = (byCat[t[3]] || 0) + t[4]; });
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+
+  const row = t => {
+    const off = ex.has(t[6]);
+    const iss = issuerOf(t[8]);
+    return `<tr class="${off ? 'off' : ''}"><td class="num">${t[1]}</td>
+      <td>${escTxt(t[2])}</td>
+      <td><span class="iss" title="${escAttr(t[9] || iss.label)}"><i style="background:${
+        iss.color}"></i>${iss.label}</span></td>
+      <td>${escTxt(t[3])}</td>
+      <td class="amt nums ${off ? 'struck' : ''}">${ils(t[4])}</td>
+      <td><button class="del" data-id="${escAttr(t[6])}" title="${
+        off ? 'להחזיר את השורה לחישוב' : 'להוציא את השורה מחישוב הטיול'}">${off ? '↩' : '✂'}</button></td></tr>`;
+  };
+
+  $('trip-body').innerHTML = `
+    <div class="cards">
+      <div class="card"><div class="lbl">סה"כ הוצאות</div><div class="val">${ils(total)}</div>
+        <div class="sub2">${rows.length} תנועות</div></div>
+      <div class="card"><div class="lbl">ימי טיול</div><div class="val">${days}</div>
+        <div class="sub2">${trip.start.split('-').reverse().join('.')} – ${
+          trip.end.split('-').reverse().join('.')}</div></div>
+      <div class="card"><div class="lbl">ממוצע ליום</div><div class="val">${ils(total / days)}</div>
+        <div class="sub2">${running ? 'הטיול עדיין נמשך' : ''}</div></div>
+    </div>
+    ${running ? '<div class="hint">הטיול עדיין לא הסתיים — הסכום ימשיך לגדול בכל סנכרון.</div>' : ''}
+    <h2>לפי קטגוריה</h2>
+    <div class="panel">${cats.length ? `<table><tbody>${cats.map(([n, v]) =>
+      `<tr><td>${escTxt(n)}</td><td class="amt nums">${ils(v)}</td><td class="num">${
+        Math.round(v / total * 100)}%</td></tr>`).join('')}</tbody></table>`
+      : '<div class="hint">לא נמצאו הוצאות בין התאריכים האלה.</div>'}</div>
+    <h2>התנועות בטיול <span class="hint">(✂ מוציא שורה מהחישוב — הוצאות הבית שנפלו בטווח)</span></h2>
+    <div class="panel">
+      <table id="trip-table"><thead><tr>
+        <th>תאריך</th><th>בית עסק</th><th>כרטיס</th><th>קטגוריה</th><th>סכום</th><th></th>
+      </tr></thead><tbody>${
+        rows.map(row).join('') + inRange.filter(t => ex.has(t[6])).map(row).join('')
+        || '<tr><td colspan="6" class="hint">אין תנועות בטווח התאריכים</td></tr>'}</tbody></table>
+      <div class="hint" style="margin-top:8px">תשלומים שנגבים אחרי החזרה מופיעים בחודש שבו חויבו,
+      לא כאן — כך נספר כל שקל פעם אחת בלבד.</div>
+    </div>
+    <div style="margin-top:14px"><button id="trip-del">🗑 מחיקת הטיול</button></div>
+    <div class="hint" id="trip-msg" style="margin-top:6px"></div>`;
+
+  $('trip-table').querySelectorAll('.del').forEach(b => b.onclick = () =>
+    api('/api/trip-exclude', { trip_id: trip.id, transaction_id: b.dataset.id }, 'trip-msg'));
+  $('trip-del').onclick = () => {
+    if (confirm(`למחוק את "${trip.name}"? התנועות עצמן לא נמחקות.`)) {
+      tripId = null; saveUi();
+      api('/api/delete-trip', { trip_id: trip.id }, 'trip-msg', 'מוחקים…');
+    }
+  };
 }
 
 $('toast').onclick = () => { $('toast').className = 'toast'; };

@@ -9,3 +9,7 @@ dbt/seeds/sample_transactions.csv export-ignore
 .claude/ export-ignore
 .github/ export-ignore
 evals/ export-ignore
+
+# The tutorial GIFs are ~3.8MB of screen recordings. They belong on GitHub, where people
+# decide whether to download kaspion — not inside the download itself.
+docs/tutorial/ export-ignore

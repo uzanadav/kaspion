@@ -15,7 +15,7 @@ a failed login.
 
 **Isracard and Amex are the exception** — their login is blocked by reCAPTCHA (see
 `docs/AGENT_HANDOFF.md` §4) and appear greyed out in the dialog. Upload their statement
-`.xlsx` from the **תנועות** page instead. **ONE ZERO** needs a one-time 2FA enrollment
+`.xlsx` with the **📄 טעינת קובץ** sidebar button instead. **ONE ZERO** needs a one-time 2FA enrollment
 the dialog can't do either — use its `.xls` app export the same way.
 
 ## What you'll set up (terminal path)

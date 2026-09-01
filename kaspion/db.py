@@ -58,6 +58,27 @@ CREATE TABLE IF NOT EXISTS state.excluded_transactions (
     transaction_id TEXT PRIMARY KEY,
     excluded_at    TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
+
+-- a trip is a named date range, nothing more. Which transactions belong to it is DERIVED
+-- from their posted_date every time the page is built, never stored, so a charge that
+-- lands after the trip was created still shows up in it.
+CREATE TABLE IF NOT EXISTS state.trips (
+    trip_id    TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    country    TEXT NOT NULL DEFAULT '',
+    start_date DATE NOT NULL,
+    end_date   DATE NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+-- rows charged inside a trip's range that are not part of the trip (rent, a standing
+-- order). Per trip, never global: state.excluded_transactions hides a row from EVERY
+-- figure in the app, which is not what "this isn't a holiday expense" means.
+CREATE TABLE IF NOT EXISTS state.trip_exclusions (
+    trip_id        TEXT NOT NULL,
+    transaction_id TEXT NOT NULL,
+    PRIMARY KEY (trip_id, transaction_id)
+);
 """
 
 def connect() -> duckdb.DuckDBPyConnection:
