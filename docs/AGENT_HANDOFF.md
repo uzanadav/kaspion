@@ -225,6 +225,25 @@ September clips August's pace line at the 3rd.
 Deliberately distinct from `insights._finished()` (MIN_TXNS ≥ 10), which answers a
 different question. Do not merge them.
 
+## 6b. Trips
+
+A trip is a **named date range** (`state.trips`) and nothing else. Which transactions
+belong to it is derived in `app.js` on every render — `t[0] >= start && t[0] <= end`, then
+the shared `isSpend` — and never stored, so a charge that arrives after the trip was
+created counts the moment it is synced.
+
+- Rows charged in the range that are not part of the trip (rent, a standing order) are
+  struck out per trip in `state.trip_exclusions`. **Never route this through
+  `state.excluded_transactions`** — that hides a row from *every* figure in the app, which
+  is not what "this isn't a holiday expense" means. The excluded rows stay visible at the
+  bottom of the trip table: an exclusion you cannot see is one you cannot undo.
+- No dbt model reads either table, so the `/api/add-trip` · `/api/delete-trip` ·
+  `/api/trip-exclude` endpoints call `_build_report()` and **not** `_rebuild()`.
+- Installments charged after the trip belong to the month they are charged (invariant 7);
+  the page says so rather than guessing which later charge started in Athens.
+- Foreign currency is not tracked anywhere: `scrape.js` keeps `chargedAmount` (shekels) and
+  discards `originalAmount`/`originalCurrency`. Do not imply a € figure exists.
+
 ## 7. Traps that have already caused real bugs here
 
 - **The sync button used to default to `--source seed`** and re-injected 341 rows of
@@ -287,6 +306,20 @@ different question. Do not merge them.
   `_scrape_company()` separately bounds every scraper subprocess with
   `SCRAPE_TIMEOUT = 240` so one hung login can't occupy the lock forever — do not remove
   it, and do not raise it casually.
+
+- **The temp file an upload is written to must keep the uploaded file's own suffix.**
+  `_import_upload()` wrote every upload to a `NamedTemporaryFile(suffix=".xls")`, and
+  `openpyxl.load_workbook()` refuses **by extension** — every `.xlsx` Isracard statement
+  failed with "openpyxl does not support the old .xls file format", a message that names
+  a format the file wasn't in. `detect_format()` sniffs the magic bytes and was right the
+  whole time; only the name lied. xlrd doesn't care about the extension, which is why the
+  ONE ZERO path never showed it.
+
+- **`serve.py` runs from memory: an edit to it does nothing until the server restarts.**
+  `_build_report()` deliberately spawns a fresh process so the *report* can never be
+  stale, which makes an unrestarted server look like it picked the change up — the page
+  updates, the endpoint doesn't. After touching `serve.py`, kill the process and start it
+  again before concluding a fix didn't work.
 
 ### 7b. Packaging traps — every one of these shipped broken before it was caught
 
@@ -356,16 +389,19 @@ kaspion/
   pipeline.py            44 — the ONLY place dbt is invoked; sets KASPION_DB_PATH +
                         DBT_PROFILES_DIR. `python3 -m kaspion.pipeline build` to run it
                         by hand. A bare `dbt` cannot work — see §10.
-  report.py             265 — SQL → DATA dict, month flags, destinations, build_report()
-  assets/app.html       271 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
-  assets/app.css        467 — design tokens (light+dark), all component styles
-  assets/app.js        1215 — the whole client: state, 4 views, 7 charts, edit calls,
+  report.py             288 — SQL → DATA dict, month flags, destinations, build_report()
+  assets/app.html       301 — page skeleton with __CSS__ / __JS__ / __DATA__ slots
+  assets/app.css        485 — design tokens (light+dark), all component styles
+  assets/app.js        1374 — the whole client: state, 5 views, 7 charts, edit calls,
                         and renderEmptyState() for a brand-new install (§6)
   insights.py           285 — deterministic Hebrew observations (NO AI — see §9)
-  db.py                 124 — connect() + DDL + assign_natural_ids() (the shared
+  db.py                 130 — connect() + DDL + assign_natural_ids() (the shared
                         dedup/id-assignment every ingest path routes through)
-  serve.py              352 — local edit server; every /api/* rebuilds dbt + the report
-  cli.py                250 — terminal equivalents, plus `init` (fresh empty install)
+  serve.py              400 — local edit server; every /api/* rebuilds dbt + the report
+                        (the /api/*-trip ones rebuild the report ONLY — no dbt model
+                        reads a trip, so a dbt run there is pure waiting)
+  cli.py                327 — terminal equivalents, plus `init` (fresh empty install)
+                        and the trip writers (add/delete/toggle-exclusion)
   ingest/               statements.py (dispatcher) · isracard_file · onezero_file
                         scraper_loader (ScrapeError, add_institution, _node_bin,
                         PUPPETEER_CACHE) · crypto (COMPANY_FIELDS, FIELD_LABELS)
@@ -373,6 +409,7 @@ kaspion/
   ai/                   known_merchants.py rules → providers (none/ollama/claude)
 dbt/models/             staging → intermediate → marts
 tests/                  test_insights · test_report_charts · test_scraper_loader ·
+                        test_trips ·
                         test_db · test_crypto · test_paths · test_company_fields
                         (skipped without scraper/node_modules)
 scripts/                setup.sh/.ps1 (developer) · install.ps1 (end user, MUST keep its

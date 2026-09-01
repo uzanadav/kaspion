@@ -108,6 +108,83 @@ def delete_category(category_id: str) -> int:
     return moved
 
 
+# ---------- trips: a named date range, for "what did the holiday cost?" ----------
+
+def trip_row(name: str, country: str, start: str, end: str) -> dict:
+    """Validate a trip and mint its id. Pure — no database, so it is testable directly.
+
+    Hebrew messages: they are shown as-is in the dashboard.
+    """
+    name = (name or "").strip()[:60]
+    country = (country or "").strip()[:60]
+    if not name:
+        raise ValueError("צריך שם לטיול")
+    try:
+        # exactly what an <input type="date"> submits
+        s_date, e_date = date.fromisoformat(start), date.fromisoformat(end)
+    except (TypeError, ValueError):
+        raise ValueError("תאריך לא תקין") from None
+    if e_date < s_date:
+        raise ValueError("תאריך הסיום חייב להיות אחרי תאריך היציאה")
+    # content-derived, same scheme as db.assign_natural_ids(): re-adding the same trip
+    # updates it in place instead of leaving two identical pills on the page
+    trip_id = hashlib.sha256(f"{name}|{s_date}|{e_date}".encode()).hexdigest()[:12]
+    return {"trip_id": trip_id, "name": name, "country": country,
+            "start_date": s_date.isoformat(), "end_date": e_date.isoformat()}
+
+
+def add_trip(name: str, country: str, start: str, end: str) -> str:
+    t = trip_row(name, country, start, end)
+    con = connect()
+    con.execute(
+        """
+        INSERT INTO state.trips (trip_id, name, country, start_date, end_date)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (trip_id) DO UPDATE SET name = excluded.name, country = excluded.country
+        """,
+        [t["trip_id"], t["name"], t["country"], t["start_date"], t["end_date"]],
+    )
+    con.close()
+    return t["trip_id"]
+
+
+def delete_trip(trip_id: str) -> None:
+    """Remove a trip and the per-row exclusions that only made sense inside it."""
+    if not trip_id:
+        raise ValueError("missing trip id")
+    con = connect()
+    con.execute("DELETE FROM state.trip_exclusions WHERE trip_id = ?", [trip_id])
+    con.execute("DELETE FROM state.trips WHERE trip_id = ?", [trip_id])
+    con.close()
+
+
+def toggle_trip_exclusion(trip_id: str, transaction_id: str) -> bool:
+    """Flip whether one row counts towards this trip. Returns the new excluded state.
+
+    Scoped to the trip: the row stays in every other figure on the dashboard, unlike
+    state.excluded_transactions which hides it everywhere.
+    """
+    if not trip_id or not transaction_id:
+        raise ValueError("missing trip or transaction id")
+    con = connect()
+    excluded = con.execute(
+        "SELECT count(*) FROM state.trip_exclusions WHERE trip_id = ? AND transaction_id = ?",
+        [trip_id, transaction_id],
+    ).fetchone()[0]
+    if excluded:
+        con.execute(
+            "DELETE FROM state.trip_exclusions WHERE trip_id = ? AND transaction_id = ?",
+            [trip_id, transaction_id],
+        )
+    else:
+        con.execute(
+            "INSERT INTO state.trip_exclusions (trip_id, transaction_id) VALUES (?, ?)",
+            [trip_id, transaction_id],
+        )
+    con.close()
+    return not excluded
+
+
 def set_budget(category: str, amount: float) -> None:
     allowed = valid_categories()
     if category not in allowed:

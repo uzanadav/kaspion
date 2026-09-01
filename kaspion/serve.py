@@ -20,10 +20,13 @@ from pathlib import Path
 from kaspion.cli import (
     add_category,
     add_transaction,
+    add_trip,
     delete_category,
+    delete_trip,
     recategorize,
     remove_transaction,
     set_budget,
+    toggle_trip_exclusion,
 )
 from kaspion.ingest.crypto import COMPANY_FIELDS, remove_credentials
 from kaspion.ingest.scraper_loader import ScrapeError, add_institution
@@ -78,7 +81,10 @@ def _import_upload(filename: str, data_b64: str) -> dict:
     if not filename.lower().endswith((".xlsx", ".xls")):
         raise ValueError(f"expected an Excel statement, got '{filename}'")
     blob = base64.b64decode(data_b64)
-    with tempfile.NamedTemporaryFile(suffix=".xls", delete=False) as tmp:
+    # keep the real suffix: openpyxl refuses to open any file named .xls, so a
+    # fixed ".xls" temp name broke every .xlsx upload
+    suffix = Path(filename).suffix.lower()
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(blob)
         tmp_path = tmp.name
     try:
@@ -244,6 +250,20 @@ class Handler(BaseHTTPRequestHandler):
                     moved = delete_category(payload["category_id"])
                     _rebuild()
                     result = {"ok": True, "moved": moved}
+                # A trip is a date range in state.*, which no dbt model reads, so the
+                # trip endpoints rebuild the REPORT only — running dbt here would be
+                # twenty seconds of waiting that changes nothing.
+                elif self.path == "/api/add-trip":
+                    add_trip(payload.get("name", ""), payload.get("country", ""),
+                             payload.get("start", ""), payload.get("end", ""))
+                    _build_report()
+                elif self.path == "/api/delete-trip":
+                    delete_trip(payload.get("trip_id", ""))
+                    _build_report()
+                elif self.path == "/api/trip-exclude":
+                    toggle_trip_exclusion(payload.get("trip_id", ""),
+                                          payload.get("transaction_id", ""))
+                    _build_report()
                 elif self.path == "/api/upload":
                     # Isracard statement (.xlsx) uploaded from the dashboard — the
                     # scraper can't log in past their reCAPTCHA, so the file is the

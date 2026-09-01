@@ -1,7 +1,8 @@
 """Generate dashboard.html — a self-contained, interactive, Hebrew-RTL family finance app.
 
 Single file, no server, no Node, no frameworks. Layout: fixed sidebar navigation
-(bottom bar on mobile) with four views — overview, categories, transactions, trends.
+(bottom bar on mobile) with five views — overview, categories, transactions, trends,
+trips (a named date range: what a holiday cost).
 All months' data is embedded as JSON; vanilla JS renders everything:
   * sidebar switches views
   * header arrows / trend bars switch month
@@ -185,6 +186,15 @@ def _collect() -> dict:
           and transaction_id not in (select transaction_id from state.excluded_transactions)
         group by 1
     """)
+    # trips: named date ranges the household adds from the dashboard. Which rows belong
+    # to one is derived in the browser from posted_date, never stored — so a charge that
+    # arrives after the trip was created still counts.
+    trips = q("""
+        select trip_id, name, country, strftime(start_date, '%Y-%m-%d'),
+               strftime(end_date, '%Y-%m-%d')
+        from state.trips order by start_date desc
+    """)
+    trip_excl = q("select trip_id, transaction_id from state.trip_exclusions")
     con.close()
 
     months: dict[str, dict] = {}
@@ -216,10 +226,21 @@ def _collect() -> dict:
         if key in months:
             months[key]["income"] = float(inc)
 
+    out_sources = [{"src": s, "account": a, "n": n, "from": f, "to": t,
+                    "loaded": ld, "staleDays": int(sd)}
+                   for s, a, n, f, t, ld, sd in sources]
+
     ordered = [months[k] for k in sorted(months)]
     now = datetime.now()
     current_key = now.strftime("%Y-%m")
     _flag_months(ordered, current_key)
+    # isracard/oneZero can only ever arrive as an uploaded file (reCAPTCHA / 2FA), so
+    # their row must not read as a sync that keeps failing. Lowercased: the source string
+    # in raw.transactions is 'onezero', the institution id is 'oneZero'.
+    blocked = {k.lower() for k, v in COMPANY_FIELDS.items() if v.get("blocked")}
+    for src in out_sources:
+        src["upload"] = src["src"].lower() in blocked
+
     return {
         "months": ordered,
         # computed in Python, never by a model: figures must be exact
@@ -228,9 +249,10 @@ def _collect() -> dict:
         # lives in insights.py and must not be reimplemented in JS out of sync with it.
         "destinations": _destinations(ordered, current_key),
         "categories": [{"id": c, "name": n, "custom": bool(x)} for c, n, x in categories],
-        "sources": [{"src": s, "account": a, "n": n, "from": f, "to": t,
-                     "loaded": ld, "staleDays": int(sd)}
-                    for s, a, n, f, t, ld, sd in sources],
+        "trips": [{"id": i, "name": n, "country": c, "start": s, "end": e,
+                   "excluded": [x for t, x in trip_excl if t == i]}
+                  for i, n, c, s, e in trips],
+        "sources": out_sources,
         # what the "add account" dialog can offer, and which connections already exist
         # (one company can have several). Connection ids + labels only — never
         # credential values, which are already visible in "sources" only as an

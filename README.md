@@ -8,7 +8,8 @@ Your financial data **never leaves your computer**. No cloud, no accounts, no te
 
 > **Just want to use it?** Download the zip from Releases, unzip, and double-click
 > `install` once — then `kaspion`. No Python, no Node, no terminal, no admin rights.
-> Full Hebrew walkthrough: **[INSTALL.md](INSTALL.md)**.
+> Full Hebrew walkthrough: **[INSTALL.md](INSTALL.md)**, or see it in motion:
+> **[a guided tour in six GIFs](docs/tutorial/README.md)**.
 > The rest of this file is for developing kaspion, not running it.
 
 <div dir="rtl">
@@ -36,7 +37,8 @@ inter-account transfers and the monthly card debit (חיוב) **so a card statem
 counted twice**, categorizes merchants automatically (built-in Israeli merchant rules by default —
 no model, no download; local AI via Ollama or Claude is opt-in for the rest — and your
 manual corrections always win and are remembered forever), and renders an interactive Hebrew dashboard: income vs. spending, budgets with
-monthly pacing, per-category trends, savings tracking, and inline editing (recategorize, add
+monthly pacing, per-category trends, savings tracking, trips (name a date range — what did the
+holiday cost?), and inline editing (recategorize, add
 expenses, hide transactions, set budgets, add categories) — all from the browser.
 
 Multiple people's accounts merge into one household view, and any chart or table can be
@@ -66,9 +68,10 @@ production, as an example of the two paths:
 | **Isracard** | upload the monthly `.xlsx` from their site | their login is behind reCAPTCHA — see `docs/AGENT_HANDOFF.md` |
 | **ONE ZERO** | upload the `.xls` export from the app | needs one-time 2FA enrollment, not built yet |
 
-Uploading is on the **תנועות** page: pick one or more files and press טעינה. The file's bank
-is detected from its contents, re-uploading the same file never creates duplicates, and card
-debits inside a bank statement are automatically excluded from spending.
+Uploading is the **📄 טעינת קובץ** button in the sidebar: drag one or more files into the
+dialog (or click to browse) and press טעינה. The file's bank is detected from its contents,
+re-uploading the same file never creates duplicates, and card debits inside a bank statement
+are automatically excluded from spending.
 
 Note that a bank scraper reads the **checking account only**. If that bank's card is issued
 by someone else (הבינלאומי's cards come from CAL), add the card issuer as its own source to
@@ -136,7 +139,7 @@ it must be set *before* Python starts, since the paths resolve at import time.
    institution, fill in the fields, press the button. The login is verified before
    anything is saved, then 90 days of history is pulled and the page reloads.
    Isracard/Amex (reCAPTCHA) and ONE ZERO (2FA enrollment) are greyed out with a 🔒 —
-   upload their statement from the **תנועות** page instead. Terminal equivalent:
+   upload their statement with **📄 טעינת קובץ** in the sidebar instead. Terminal equivalent:
    `python3 -m kaspion.ingest.crypto`. Full walkthrough: `docs/SCRAPER_SETUP.md`.
 2. **Scraper dependencies (one time):** `cd scraper && npm install && cd ..`
    (the installer does this for end users).
