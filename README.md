@@ -66,11 +66,12 @@ production, as an example of the two paths:
 |---|---|---|
 | **Max** · **הבינלאומי** · **Visa CAL** | scraper, fully automatic (cron-able) | works |
 | **Isracard** | upload the monthly `.xlsx` from their site | their login is behind reCAPTCHA — see `docs/AGENT_HANDOFF.md` |
-| **ONE ZERO** | upload the `.xls` export from the app | needs one-time 2FA enrollment, not built yet |
+| **ONE ZERO** | upload the `.pdf` statement (or the older `.xls` export) | needs one-time 2FA enrollment, not built yet |
 
 Uploading is the **📄 טעינת קובץ** button in the sidebar: drag one or more files into the
 dialog (or click to browse) and press טעינה. The file's bank is detected from its contents,
-re-uploading the same file never creates duplicates, and card debits inside a bank statement
+re-uploading the same file never creates duplicates — nor does a ONE ZERO PDF that overlaps
+an .xls export already imported — and card debits inside a bank statement
 are automatically excluded from spending.
 
 Note that a bank scraper reads the **checking account only**. If that bank's card is issued

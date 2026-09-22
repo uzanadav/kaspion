@@ -78,8 +78,8 @@ def _import_upload(filename: str, data_b64: str) -> dict:
 
     from kaspion.ingest.statements import import_statement
 
-    if not filename.lower().endswith((".xlsx", ".xls")):
-        raise ValueError(f"expected an Excel statement, got '{filename}'")
+    if not filename.lower().endswith((".xlsx", ".xls", ".pdf")):
+        raise ValueError(f"expected an Excel or PDF statement, got '{filename}'")
     blob = base64.b64decode(data_b64)
     # keep the real suffix: openpyxl refuses to open any file named .xls, so a
     # fixed ".xls" temp name broke every .xlsx upload

@@ -49,7 +49,7 @@ def upsert_rows(rows: list[dict]) -> tuple[int, int]:
 
 
 def detect_format(path: str | Path) -> str:
-    """'onezero' | 'isracard', decided by the file itself rather than its name.
+    """'onezero' | 'onezero_pdf' | 'isracard', decided by the file rather than its name.
 
     Downloads get renamed, and both banks hand out files called *.xls*, so sniffing
     the container and its header is the only reliable signal.
@@ -58,9 +58,40 @@ def detect_format(path: str | Path) -> str:
         magic = handle.read(8)
     if magic.startswith(b"\xd0\xcf\x11\xe0"):   # OLE2 compound file -> legacy .xls
         return "onezero"
+    if magic.startswith(b"%PDF"):               # ONE ZERO hands out a PDF now
+        return "onezero_pdf"
     if magic.startswith(b"PK"):                 # zip container -> .xlsx
         return "isracard"
-    raise ValueError("unrecognised file: expected an Excel statement (.xls or .xlsx)")
+    raise ValueError("unrecognised file: expected a statement (.xls, .xlsx or .pdf)")
+
+
+def drop_known_by_date_and_amount(rows: list[dict]) -> list[dict]:
+    """Drop rows the database already holds, matching on date and amount only.
+
+    ONE ZERO describes the same movement differently in its PDF than in its .xls
+    export ("חיוב מ -מקס איט פיננסים" vs "מקס איט פיננסים/34685693"), so the content
+    identity in assign_natural_ids sees two different transactions and would import
+    an account's whole overlap twice. Matching is by MULTIPLICITY, not existence: two
+    ₪100 standing orders on the same day are two real movements, and importing an
+    export that contains both when the database holds one must still add the second.
+    """
+    from collections import Counter
+
+    con = connect()
+    seen: Counter = Counter()
+    keep = []
+    for row in rows:
+        key = (row["account_id"], row["posted_date"], f'{float(row["amount"]):.2f}')
+        seen[key] += 1
+        held = con.execute(
+            "SELECT count(*) FROM raw.transactions "
+            "WHERE account_id = ? AND posted_date = ? AND amount = ?",
+            [key[0], key[1], float(row["amount"])],
+        ).fetchone()[0]
+        if seen[key] > held:
+            keep.append(row)
+    con.close()
+    return keep
 
 
 def import_statement(path: str | Path) -> dict:
@@ -68,8 +99,12 @@ def import_statement(path: str | Path) -> dict:
     kind = detect_format(path)
     if kind == "onezero":
         from kaspion.ingest.onezero_file import parse_file
+    elif kind == "onezero_pdf":
+        from kaspion.ingest.onezero_pdf import parse_file
     else:
         from kaspion.ingest.isracard_file import parse_file
     rows = parse_file(path)
+    if kind.startswith("onezero"):
+        rows = drop_known_by_date_and_amount(rows)
     added, updated = upsert_rows(rows)
     return {"source": kind, "added": added, "updated": updated, "parsed": len(rows)}

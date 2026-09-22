@@ -14,9 +14,11 @@ dependencies = [
     "requests>=2.32",
     "cryptography>=43.0",
     # reading bank/card statement exports uploaded from the dashboard:
-    # openpyxl for .xlsx (Isracard), xlrd for legacy OLE2 .xls (ONE ZERO)
+    # openpyxl for .xlsx (Isracard), xlrd for legacy OLE2 .xls and pypdf for the PDF
+    # statement that replaced it (both ONE ZERO)
     "openpyxl>=3.1",
     "xlrd>=2.0",
+    "pypdf>=5.1",
     # ships Node as a Python dependency so end users never install it separately —
     # scraper/package.json's israeli-bank-scrapers requires Node >= 22.22.2
     "nodejs-wheel>=22.22",

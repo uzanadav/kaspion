@@ -52,7 +52,7 @@ their own Python, Node and Chromium.
 ```
 statements ─┬─ scraper (Node: max, beinleumi, visaCal) ─┐
             ├─ .xlsx upload (Isracard)                  ├─▶ raw.transactions ─▶ dbt ─▶ dashboard.html
-            └─ .xls upload (ONE ZERO)                   ─┘
+            └─ .pdf / .xls upload (ONE ZERO)            ─┘
 ```
 
 - `raw.*` — written by ingest only.
@@ -75,7 +75,7 @@ Five accounts, two people:
 | Source | Whose | Method | Why |
 |---|---|---|---|
 | **Max** | owner | scraper (automatic) | works |
-| **ONE ZERO** | owner | manual `.xls` upload | scraper needs 2FA enrollment; not built |
+| **ONE ZERO** | owner | manual `.pdf` (or `.xls`) upload | scraper needs 2FA enrollment; not built |
 | **Isracard** | owner | manual `.xlsx` upload | **login blocked by reCAPTCHA** |
 | **הבינלאומי / Beinleumi** | wife | scraper (automatic) | works |
 | **Visa CAL** | wife | scraper (automatic) | works |
@@ -315,6 +315,16 @@ created counts the moment it is synced.
   whole time; only the name lied. xlrd doesn't care about the extension, which is why the
   ONE ZERO path never showed it.
 
+- **The same movement is worded differently in ONE ZERO's PDF and its .xls, so content
+  identity alone would import the overlap twice.** The PDF calls a card debit
+  `חיוב מ -מקס איט פיננסים`; the .xls calls it `מקס איט פיננסים/34685693`. Different text,
+  different content id, two rows for one movement. `statements.drop_known_by_date_and_amount()`
+  runs before the upsert for every ONE ZERO import and matches on (account, date, amount)
+  by **multiplicity** — existence would be wrong: two ₪100 standing orders on 11/06 are two
+  real movements, and the .xls importer had already collapsed each such pair into one (its
+  descriptions are byte-identical, so `assign_natural_ids` cannot tell them apart). The PDF
+  import restored three of them.
+
 - **`serve.py` runs from memory: an edit to it does nothing until the server restarts.**
   `_build_report()` deliberately spawns a fresh process so the *report* can never be
   stale, which makes an unrestarted server look like it picked the change up — the page
@@ -402,7 +412,8 @@ kaspion/
                         reads a trip, so a dbt run there is pure waiting)
   cli.py                327 — terminal equivalents, plus `init` (fresh empty install)
                         and the trip writers (add/delete/toggle-exclusion)
-  ingest/               statements.py (dispatcher) · isracard_file · onezero_file
+  ingest/               statements.py (dispatcher) · isracard_file · onezero_file ·
+                        onezero_pdf
                         scraper_loader (ScrapeError, add_institution, _node_bin,
                         PUPPETEER_CACHE) · crypto (COMPANY_FIELDS, FIELD_LABELS)
                         · generate_seed

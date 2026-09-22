@@ -352,7 +352,7 @@ $('u-drop').ondrop = e => {
 // the whole batch anonymously.
 $('u-go').onclick = async () => {
   const files = [...$('u-file').files];
-  if (!files.length) { $('u-msg').textContent = 'בחרו קובץ Excel שהורדתם מאתר ישראכרט'; return; }
+  if (!files.length) { $('u-msg').textContent = 'בחרו קובץ שהורדתם מישראכרט או מ־ONE ZERO'; return; }
   document.querySelectorAll('button').forEach(b => b.disabled = true);
   let added = 0, updated = 0;
   try {
